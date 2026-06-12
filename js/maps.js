@@ -21,6 +21,7 @@ class MapBuilder {
     this.exit = null;
     this.name = id; this.title = ""; this.intro = []; this.objective = "";
     this.dread = 0.3;
+    this.palette = { floor:[42,46,44], wall:[30,28,34] };
   }
   inBounds(x,y){ return x>=0 && y>=0 && x<this.W && y<this.H; }
   setFloor(x,y){ if(this.inBounds(x,y)) this.grid[y][x]=1; }
@@ -54,6 +55,7 @@ function ch1() {
   m.name = "Chapitre I — L'Accueil";
   m.title = "L'ACCUEIL";
   m.dread = 0.25;
+  m.palette = { floor:[44,46,50], wall:[30,28,36] };
   m.intro = [
     "Institut psychiatrique Blackwood. Fermé depuis 1987.",
     "Vous êtes Daniel Reyes, journaliste.",
@@ -106,6 +108,7 @@ function ch2() {
   m.name = "Chapitre II — Le Quartier des Patients";
   m.title = "LE QUARTIER";
   m.dread = 0.45;
+  m.palette = { floor:[46,43,38], wall:[32,27,26] };
   m.intro = [
     "Le quartier des patients. Douze chambres. Des murs griffés.",
     "Quelque chose bouge ici. Ne courez que si vous y êtes forcé —",
@@ -122,6 +125,10 @@ function ch2() {
     m.door(x+2,15,{}); m.vcorr(16,14,x+2);
     m.deco(x+1,9,'bed'); m.deco(x+3,9,'bed');
   }
+  // service corridor along the back of the north rooms — a flanking route
+  m.hcorr(8,43,6);
+  m.vcorr(6,8,8); m.vcorr(6,8,22); m.vcorr(6,8,36); m.vcorr(6,8,43);
+  m.item(30,6,'battery',1);
   for (let i=0;i<6;i++){
     const x=6+i*7;
     m.room(x,20,5,6);
@@ -131,7 +138,8 @@ function ch2() {
   m.note(8,9,'n_diary1');
   m.note(15,9,'n_child');
   m.item(16,24,'medkit',1);
-  m.item(23,9,'battery',2);
+  m.item(23,9,'battery',3);
+  m.item(30,24,'battery',2);
   m.note(29,24,'f1');
   m.note(36,9,'n_diary2');
   m.item(37,24,'pills',1);
@@ -151,12 +159,15 @@ function ch2() {
   m.door(4,28,{locked:true,key:'key_morgue',label:"Escalier vers le sous-sol"});
   m.hcorr(4,5,28); m.vcorr(17,28,5);
   m.setExit(3,29);
-  m.locker(20,16); m.locker(33,17); m.locker(7,21);
-  m.mob(46,16,{enabled:true,speed:2.9,roam:[[46,16],[6,16],[25,9],[25,24]]});
+  m.locker(20,16); m.locker(33,17); m.locker(7,21); m.locker(43,17);
+  // spawns far from the player AND from the pharmacy keypad; slow; 8s of grace.
+  // (player walks at 3.6, runs at 6.6 — it can always be outrun in a straight line)
+  m.mob(29,23,{enabled:true,speed:2.35,delay:8,roam:[[29,23],[44,9],[10,9],[43,24]]});
   m.trigger({ x:12,y:16, r:1.4, action:[
-    {type:'stinger',intensity:0.7},
-    {type:'subtitle',text:"Un patient était assis là. Vous clignez des yeux. La chaise est vide."},
-    {type:'sanity',amount:-6} ] });
+    {type:'screamer',text:"UN PATIENT VOUS SAUTE AU VISAGE EN HURLANT. Puis la chaise est vide.",sanity:9},
+    {type:'sanity',amount:-4} ] });
+  m.trigger({ x:40,y:16, r:1.4, action:[
+    {type:'scrape'},{type:'subtitle',text:"Des ongles raclent l'acier, quelque part dans le couloir."},{type:'sanity',amount:-4} ] });
   m.trigger({ x:25,y:16, r:1.4, action:[
     {type:'subtitle',text:"« Il a faim », murmurent les murs. Tous en même temps."},
     {type:'sound',name:'whisper'},{type:'sanity',amount:-5} ] });
@@ -169,6 +180,7 @@ function ch3() {
   m.name = "Chapitre III — Le Sous-sol";
   m.title = "LE SOUS-SOL";
   m.dread = 0.6;
+  m.palette = { floor:[36,46,41], wall:[24,32,29] };
   m.intro = [
     "Le sous-sol est noyé dans le noir et l'eau croupie.",
     "Le générateur est mort. Sans courant, la chambre froide se réchauffe —",
@@ -216,6 +228,8 @@ function ch3() {
   m.mob(45,5,{enabled:true,speed:3.0,roam:[[45,5],[12,14],[24,30],[6,22]]});
   m.trigger({ x:12,y:14, r:1.4, action:[
     {type:'sound',name:'whisper'},{type:'subtitle',text:"De l'eau goutte. Puis des pas. Lourds. Mouillés."},{type:'sanity',amount:-6} ] });
+  m.trigger({ x:24,y:30, r:1.6, action:[
+    {type:'screamer',text:"UNE MAIN BLÊME JAILLIT DE L'EAU et vous agrippe la cheville. Vous vous dégagez.",sanity:10} ] });
   return m;
 },
 
@@ -225,6 +239,7 @@ function ch4() {
   m.name = "Chapitre IV — La Morgue";
   m.title = "LA MORGUE";
   m.dread = 0.72;
+  m.palette = { floor:[40,44,52], wall:[27,29,38] };
   m.intro = [
     "La morgue. Des casiers d'acier, du sol au plafond.",
     "Le froid vous mord. Quelque chose frappe — de l'intérieur du casier n°9.",
@@ -260,9 +275,11 @@ function ch4() {
   m.locker(10,20); m.locker(35,9); m.locker(30,16);
   m.mob(38,9,{enabled:true,speed:3.15,roam:[[38,9],[12,14],[24,20],[33,9]]});
   m.trigger({ x:38,y:14, r:1.8, action:[
-    {type:'stinger',intensity:1.0},
-    {type:'subtitle',text:"Le casier n°9 explose de l'intérieur. La table est vide. Cours."},
-    {type:'sanity',amount:-14},{type:'enrage'} ] });
+    {type:'scrape'},
+    {type:'screamer',text:"LE CASIER N°9 EXPLOSE — UNE CHOSE EN JAILLIT DROIT SUR VOUS. La table est vide. COURS.",sanity:14},
+    {type:'enrage'} ] });
+  m.trigger({ x:16,y:15, r:1.4, action:[
+    {type:'breath'},{type:'subtitle',text:"Un casier s'entrouvre tout seul derrière vous."},{type:'sanity',amount:-5} ] });
   m.trigger({ x:24,y:14, r:1.4, action:[
     {type:'sound',name:'whisper'},{type:'subtitle',text:"On vous appelle Daniel. Ne répondez pas."},{type:'sanity',amount:-6} ] });
   return m;
@@ -274,6 +291,7 @@ function ch5() {
   m.name = "Chapitre V — La Chapelle";
   m.title = "LA CHAPELLE & LE BUREAU";
   m.dread = 0.82;
+  m.palette = { floor:[48,41,33], wall:[34,27,21] };
   m.intro = [
     "La chapelle. Le seul endroit où le personnel se réfugiait.",
     "Sous l'autel : une amulette. La seule chose qu'il craigne.",
@@ -310,10 +328,10 @@ function ch5() {
   m.hcorr(28,34,26); m.vcorr(15,26,28);
   m.setExit(37,26,(st)=>st.inv.has('hand_crank'));
   m.locker(10,24); m.locker(22,10); m.locker(26,20);
-  m.mob(35,15,{enabled:true,speed:3.25,roam:[[35,15],[12,20],[12,6],[24,20]]});
+  m.mob(31,15,{enabled:true,speed:3.25,roam:[[31,15],[12,20],[12,6],[24,20]]});
   m.trigger({ x:31,y:9, r:1.6, action:[
-    {type:'subtitle',text:"L'ombre tassée sur le fauteuil se lève. Le directeur n'a plus de visage."},
-    {type:'sanity',amount:-10},{type:'enrage'} ] });
+    {type:'screamer',text:"L'OMBRE SUR LE FAUTEUIL BONDIT — le directeur n'a plus de visage, seulement une bouche.",sanity:12},
+    {type:'enrage'} ] });
   m.trigger({ x:12,y:18, r:1.6, action:[
     {type:'sound',name:'whisper'},{type:'subtitle',text:"Les bancs sont pleins. Vous regardez à nouveau : vides."},{type:'sanity',amount:-8} ] });
   return m;
@@ -325,6 +343,7 @@ function ch6() {
   m.name = "Chapitre VI — Le Toit";
   m.title = "L'ÉVASION";
   m.dread = 1.0;
+  m.palette = { floor:[50,36,34], wall:[36,23,22] };
   m.intro = [
     "Dernier étage. Il sait que vous partez. Il est juste derrière.",
     "Le monte-charge mène au toit, mais il faut la manivelle.",
@@ -355,7 +374,9 @@ function ch6() {
   m.locker(10,15); m.locker(28,12); m.locker(22,24);
   m.mob(8,15,{enabled:true,speed:3.4,roam:[[8,15],[30,15],[14,8],[22,24]]});
   m.trigger({ x:8,y:15, r:1.3, action:[
-    {type:'growl'},{type:'subtitle',text:"IL EST DERRIÈRE VOUS. COUREZ."},{type:'enrage'} ] });
+    {type:'screamer',text:"IL EST DERRIÈRE VOUS. COUREZ.",sanity:8},{type:'enrage'} ] });
+  m.trigger({ x:24,y:15, r:1.4, action:[
+    {type:'scrape'},{type:'subtitle',text:"Les murs se rapprochent. Ou bien c'est lui."},{type:'sanity',amount:-5} ] });
   return m;
 }
 

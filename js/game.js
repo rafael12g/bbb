@@ -43,6 +43,19 @@ const Game = (() => {
   let exitHintTimer = 0;
   let deaths = 0;
   let advancing = false;
+  // --- fear & polish state ---
+  let shake = 0;              // screen shake magnitude (px)
+  let flickerSmooth = 1;      // flashlight stability 0..1
+  let flickerHold = 0;        // forced flicker burst (s)
+  let ambientTimer = 14;      // next ambient scare event
+  let stalker = null;         // fleeting silhouette {x,y,life}
+  let stalkerTimer = 22;
+  let particles = null;       // dust motes in the beam
+  let caughtLock = false;     // prevents double-death
+  let sanityFilterStep = -1;  // cached css filter bucket
+  let screamerCD = 18;        // cooldown before next random screamer
+  let pendingScare = 0;       // >0 = riser armed, counting down to the bang
+  let behindCD = 0;           // cooldown for "breath behind you"
 
   // ---------- setup ----------
   function init(cv){
@@ -109,6 +122,12 @@ const Game = (() => {
     monster = map.monster ? new Monster(map.monster.x, map.monster.y, map.monster) : null;
     flashlightOn = true;
     hideLocker = null; blocking = false; matchTimer = 0;
+    shake = 0; flickerSmooth = 1; flickerHold = 0;
+    ambientTimer = 10 + Math.random()*10;
+    stalker = null; stalkerTimer = 16 + Math.random()*14;
+    particles = null; caughtLock = false;
+    screamerCD = 45 + Math.random()*35; pendingScare = 0; behindCD = 0;
+    sanityFilterStep = -1; canvas.style.filter = '';
     // snapshot for retry
     chapterStartSnap = {
       sanity: state.sanity, battery: state.battery,
@@ -245,6 +264,138 @@ const Game = (() => {
     updateMeters(dt);
     checkExit();
     hallucinations(dt);
+    fearUpdate(dt);
+  }
+
+  // fire a full screamer right now (mid-gameplay jolt, not a death)
+  const SCARE_LINES = [
+    "QUELQUE CHOSE A HURLÉ DANS VOTRE OREILLE.",
+    "Un visage. Juste devant le vôtre. Puis plus rien.",
+    "Vous n'êtes pas seul. Vous ne l'avez jamais été.",
+    "IL VOUS A SOURI.",
+  ];
+  function doScreamer(opts={}){
+    // a hard cut to silence + black for a split second... then the face SLAMS in
+    Audio.holdBreath();
+    UI.blackout(150);
+    setTimeout(()=>{
+      UI.screamer(opts.dur||1000, opts.variant);
+      Audio.screamer();
+    }, 140);
+    shake = Math.max(shake, opts.shake||40);
+    flickerHold = Math.max(flickerHold, 1.6);
+    state.sanity = Math.max(0, state.sanity - (opts.sanity!=null?opts.sanity:8));
+    if (opts.text!==null)
+      UI.subtitle(opts.text || SCARE_LINES[Math.floor(Math.random()*SCARE_LINES.length)], 2200);
+    screamerCD = (opts.cd!=null?opts.cd : (40 + Math.random()*35));
+  }
+
+  // ---------- fear systems: flicker, ambient events, stalker ----------
+  function fearUpdate(dt){
+    // flashlight flicker — worse when IT is near
+    const near = monster && map.monster && map.monster.enabled
+      ? Math.hypot(player.x-monster.x, player.y-monster.y) : 99;
+
+    // ===== screamer scheduler (sudden — no telegraph) =====
+    screamerCD -= dt;
+    if (screamerCD <= 0){
+      const tension = (1 - state.sanity/100) + (near < 11 ? 0.6 : 0) + map.dread*0.5;
+      if (Math.random() < dt * (0.045 + 0.09*tension)) doScreamer();
+    }
+
+    // ===== breath right behind you =====
+    behindCD -= dt;
+    if (behindCD <= 0 && near < 3.8 && monster.state!=='repelled'){
+      // is it behind the way you're facing?
+      const ang = Math.atan2(monster.y-player.y, monster.x-player.x);
+      let diff = Math.abs(((ang - player.facing + Math.PI)%(Math.PI*2)) - Math.PI);
+      if (diff > 1.9){ // it's behind you and you can't see it
+        Audio.breath(); shake = Math.max(shake, 3); behindCD = 9 + Math.random()*6;
+        if (Math.random() < 0.25) doScreamer({dur:420, sanity:6, text:"Un souffle chaud. Juste derrière votre nuque.", cd:40});
+        else UI.subtitle("Vous sentez une respiration dans votre dos...", 1800);
+      }
+    }
+    let target = 1;
+    if (flickerHold > 0){ flickerHold -= dt; target = 0.25 + Math.random()*0.5; }
+    else if (near < 8 && flashlightActive()){
+      target = 0.45 + Math.random()*0.55;
+      if (Math.random() < dt*1.5) Audio.buzz();
+    }
+    else if (state.battery < 15 && flashlightOn){ target = 0.6 + Math.random()*0.4; }
+    else if (Math.random() < dt*0.25){ target = 0.7; } // occasional idle blink
+    flickerSmooth += (target - flickerSmooth) * Math.min(1, dt*14);
+
+    // screen shake decay (+ constant rumble while chased up close)
+    shake = Math.max(0, shake - dt*26);
+    if (monster && monster.state==='chase' && near < 5) shake = Math.max(shake, 2);
+
+    // ambient one-shot scares
+    ambientTimer -= dt;
+    if (ambientTimer <= 0){
+      ambientTimer = 16 + Math.random()*16;
+      const roll = Math.random();
+      if (state.inv.has('doll') && roll < 0.25){
+        Audio.giggle();
+        UI.subtitle("Un rire d'enfant. Tout près. La poupée est tiède dans votre sac.", 2600);
+        state.sanity = Math.max(0, state.sanity - 3);
+      } else if (roll < 0.4){
+        Audio.slam(); shake = Math.max(shake, 7);
+        UI.subtitle("Une porte claque, quelque part dans le bâtiment.", 2200);
+      } else if (roll < 0.6){
+        Audio.growl(0.95);
+      } else if (roll < 0.78){
+        Audio.whisper();
+      } else {
+        // the light dies for a moment
+        flickerHold = 1.2; Audio.buzz();
+      }
+    }
+
+    // stalker apparition — a silhouette at the edge of your beam
+    stalkerTimer -= dt;
+    if (!stalker && stalkerTimer <= 0 && !player.hidden){
+      stalkerTimer = 30 + Math.random()*26;
+      const a = player.facing + (Math.random()-0.5)*0.7;
+      const d = 5.5 + Math.random()*2;
+      const sx = player.x + Math.cos(a)*d, sy = player.y + Math.sin(a)*d;
+      const tx = Math.floor(sx), ty = Math.floor(sy);
+      if (!isWall(tx,ty)){
+        stalker = { x:sx, y:sy, life: 0.9 };
+        Audio.whisper();
+      }
+    }
+    if (stalker){
+      stalker.life -= dt;
+      if (stalker.life <= 0){
+        stalker = null;
+        if (Math.random() < 0.3 && screamerCD < 900){
+          // the silhouette lunges at the screen
+          doScreamer({dur:460, sanity:7, text:"Elle s'est jetée sur vous. Le faisceau n'éclaire que le mur.", cd:45});
+        } else {
+          Audio.stinger(0.35); shake = Math.max(shake, 5);
+          state.sanity = Math.max(0, state.sanity - 4);
+          if (Math.random()<0.5) UI.subtitle("Il y avait quelqu'un. Il n'y a plus personne.", 2000);
+        }
+      }
+    }
+
+    // dust motes drifting in the dark
+    if (!particles){
+      particles = [];
+      for (let i=0;i<46;i++) particles.push({
+        x: player.x + (Math.random()-0.5)*16,
+        y: player.y + (Math.random()-0.5)*16,
+        vx: (Math.random()-0.5)*0.12, vy: (Math.random()-0.5)*0.12,
+        s: 0.5 + Math.random()*1.2,
+      });
+    }
+    particles.forEach(p=>{
+      p.x += p.vx*dt; p.y += p.vy*dt;
+      if (Math.abs(p.x-player.x)>9 || Math.abs(p.y-player.y)>9){
+        const a=Math.random()*Math.PI*2, d=4+Math.random()*4;
+        p.x = player.x+Math.cos(a)*d; p.y = player.y+Math.sin(a)*d;
+      }
+    });
   }
 
   function updateCam(){
@@ -257,7 +408,7 @@ const Game = (() => {
 
   function computeLighting(){
     const sanF = 0.55 + 0.45*(state.sanity/100);
-    const range = (matchTimer>0 ? 5 : 9) ;
+    const range = (matchTimer>0 ? 5 : 9) * (0.55 + 0.45*flickerSmooth);
     Lighting.compute(player.x, player.y, player.facing,
       flashlightActive(), 0.62, range, 2.6, sanF,
       (x,y)=>isWall(x,y));
@@ -268,9 +419,9 @@ const Game = (() => {
   function inDarkness(){ return !flashlightActive(); }
 
   function updateMeters(dt){
-    // battery
+    // battery — lasts much longer now (~2 min of continuous use)
     if (flashlightOn && state.battery>0 && matchTimer<=0){
-      state.battery = Math.max(0, state.battery - dt*2.4);
+      state.battery = Math.max(0, state.battery - dt*1.3);
       if (state.battery<15){ lowBatWarn-=dt; if(lowBatWarn<=0){ Audio.batteryLow(); lowBatWarn=1.2; } }
       if (state.battery<=0){ flashlightOn=false; UI.toast("La lampe s'éteint. Vous êtes dans le noir.", 'bad'); }
     }
@@ -281,12 +432,15 @@ const Game = (() => {
     let near = monster ? Math.hypot(player.x-monster.x, player.y-monster.y) : 99;
     let chasing = monster && (monster.state==='chase'||monster.enraged && near<8);
     if (inDarkness()){
-      // the dark in your own head erodes you
-      state.sanity = Math.max(0, state.sanity - dt*(2.0 + dread*3));
+      // darkness ALONE never kills — it bottoms out and just makes you uneasy.
+      // only the creature being close can push you to the breaking point.
+      const floor = near < 7 ? 0 : 28;
+      if (state.sanity > floor)
+        state.sanity = Math.max(floor, state.sanity - dt*(0.9 + dread*1.1));
     } else {
-      state.sanity = Math.min(100, state.sanity + dt*1.2);
+      state.sanity = Math.min(100, state.sanity + dt*1.8);
     }
-    if (near < 6){ state.sanity = Math.max(0, state.sanity - dt*(6-near)*1.4); }
+    if (near < 6){ state.sanity = Math.max(0, state.sanity - dt*(6-near)*1.3); }
     Audio.setBreathing(state.sanity < 35);
 
     // heartbeat scales with threat
@@ -302,6 +456,14 @@ const Game = (() => {
     UI.meters(state.sanity/100, state.battery/100, player.stamina);
     UI.vignette(Math.min(1, dread*0.5 + (1-state.sanity/100)*0.7 + (chasing?0.3:0)));
     refreshHotbar();
+
+    // madness distorts the image itself (bucketed to avoid style churn)
+    const step = state.sanity >= 40 ? 0 : Math.ceil((40-state.sanity)/8);
+    if (step !== sanityFilterStep){
+      sanityFilterStep = step;
+      canvas.style.filter = step === 0 ? '' :
+        `contrast(${1+step*0.07}) saturate(${Math.max(0.4,1-step*0.12)}) hue-rotate(-${step*4}deg)`;
+    }
   }
 
   function onSanityBreak(){
@@ -454,6 +616,7 @@ const Game = (() => {
   function toggleHide(){
     if (player.hidden){
       player.hidden=false; hideLocker.occupied=false; hideLocker=null;
+      player.safe = 1.3;            // brief grace so it can't camp the locker
       Audio.lockerHide(); UI.prompt(null);
       return;
     }
@@ -531,7 +694,10 @@ const Game = (() => {
         case 'unlockDoor': { const d=map.doors[a.x+","+a.y]; if(d){ d.locked=false; d.open=true; } break; }
         case 'toast': UI.toast(a.text, a.kind); break;
         case 'subtitle': UI.subtitle(a.text); break;
-        case 'stinger': Audio.stinger(a.intensity||1); UI.damageFlash(); break;
+        case 'stinger': Audio.stinger(a.intensity||1); UI.damageFlash(); shake = Math.max(shake, 6+8*(a.intensity||1)); break;
+        case 'screamer': doScreamer({ dur:a.dur||560, sanity:a.sanity!=null?a.sanity:12, text:a.text!==undefined?a.text:undefined, shake:a.shake||26 }); break;
+        case 'scrape': Audio.scrape(); break;
+        case 'breath': Audio.breath(); break;
         case 'sound': if (Audio[a.name]) Audio[a.name](); break;
         case 'growl': Audio.growl(0.2); break;
         case 'sanity': state.sanity=Math.max(0,Math.min(100,state.sanity+(a.amount||0))); break;
@@ -560,9 +726,16 @@ const Game = (() => {
 
   // ---------- caught / death ----------
   function onCaught(){
-    if (state.mode!=='playing') return;
-    Audio.scream(); UI.damageFlash();
-    die("Il vous a trouvé. Les bras se referment, et le noir vous avale.");
+    if (state.mode!=='playing' || caughtLock) return;
+    caughtLock = true;
+    state.mode = 'dying';           // freeze the simulation
+    Audio.scream(); Audio.stinger(1);
+    shake = 26;
+    UI.showJumpscare();
+    setTimeout(()=>{
+      UI.hideJumpscare();
+      die("Il vous a trouvé. Les bras se referment, et le noir vous avale.");
+    }, 950);
   }
   function die(msg){
     state.mode='dead';
@@ -588,6 +761,7 @@ const Game = (() => {
     UI.hide('pause'); UI.showHUD(false);
     UI.show('menu');
     Audio.heartbeat(0); Audio.setBreathing(false);
+    canvas.style.filter=''; sanityFilterStep=-1;
   }
 
   // ---------- overlays toggles ----------
@@ -599,9 +773,18 @@ const Game = (() => {
   // =========================================================
   //  RENDERING
   // =========================================================
+  // deterministic per-tile hash for texture variation
+  function tileHash(x,y){ let h=(x*73856093) ^ (y*19349663); h=(h^(h>>13))>>>0; return h; }
+
   function render(){
     ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
-    if (!map || (state.mode!=='playing' && state.mode!=='paused' && state.mode!=='dead')) return;
+    if (!map || (state.mode!=='playing' && state.mode!=='paused' && state.mode!=='dead' && state.mode!=='dying')) return;
+
+    // screen shake
+    ctx.save();
+    if (shake > 0.2){
+      ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+    }
 
     const s=cam.scale;
     const x0=Math.floor(player.x - canvas.width/(2*s)) - 1;
@@ -609,24 +792,74 @@ const Game = (() => {
     const y0=Math.floor(player.y - canvas.height/(2*s)) - 1;
     const y1=Math.ceil (player.y + canvas.height/(2*s)) + 1;
 
+    // brightness with neighbor smoothing (kills the blocky look)
+    const L=(x,y)=>Math.max(Lighting.lightAt(x,y), Lighting.exploredAt(x,y)*0.55);
+    const smoothL=(x,y)=>(L(x,y)*4 + L(x+1,y)+L(x-1,y)+L(x,y+1)+L(x,y-1))*0.125;
+
+    const pal = map.palette;
+    const fr=pal.floor[0], fg=pal.floor[1], fb=pal.floor[2];
+    const wr=pal.wall[0],  wg=pal.wall[1],  wb=pal.wall[2];
+
     // tiles
     for (let ty=y0; ty<=y1; ty++){
       for (let tx=x0; tx<=x1; tx++){
         if (tx<0||ty<0||tx>=map.W||ty>=map.H) continue;
-        const lit=Lighting.lightAt(tx,ty);
-        const mem=Lighting.exploredAt(tx,ty);
-        const b=Math.max(lit, mem*0.55);
+        const b=smoothL(tx,ty);
         if (b<0.03) continue;
         const wall=map.grid[ty][tx]===0;
         const sx=tx*s+cam.ox, sy=ty*s+cam.oy;
+        const h=tileHash(tx,ty);
+        const jit=0.92 + (h%17)/100;           // ±8% per-tile tone variation
+        const f=Math.min(1, b*1.25)*jit;
         let r,g,bl;
-        if (wall){ r=26; g=24; bl=30; } else { r=40; g=44; bl=42; }
-        const f=Math.min(1, b*1.25);
+        if (wall){ r=wr; g=wg; bl=wb; } else { r=fr; g=fg; bl=fb; }
         ctx.fillStyle=`rgb(${Math.round(r*f+4)},${Math.round(g*f+4)},${Math.round(bl*f+5)})`;
         ctx.fillRect(sx,sy,s+1,s+1);
-        if (!wall && b>0.1){ // floor grout lines
-          ctx.fillStyle=`rgba(0,0,0,${0.15*f})`;
-          ctx.fillRect(sx,sy,s+1,1); ctx.fillRect(sx,sy,1,s+1);
+
+        if (!wall){
+          if (b>0.1){ // floor grout lines
+            ctx.fillStyle=`rgba(0,0,0,${0.15*f})`;
+            ctx.fillRect(sx,sy,s+1,1); ctx.fillRect(sx,sy,1,s+1);
+          }
+          // old blood stains
+          if (h%19===0 && b>0.12){
+            ctx.save(); ctx.globalAlpha=Math.min(0.5, f*0.5);
+            ctx.fillStyle='#3a0a08';
+            const ox=(h>>4)%10/10, oy=(h>>7)%10/10, rr=s*(0.18+((h>>9)%10)/40);
+            ctx.beginPath(); ctx.ellipse(sx+s*0.3+ox*s*0.4, sy+s*0.3+oy*s*0.4, rr, rr*0.7, h%6, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(sx+s*0.2+ox*s*0.5, sy+s*0.6, rr*0.3, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+          }
+          // scattered grime
+          if (h%7===0 && b>0.15){
+            ctx.fillStyle=`rgba(0,0,0,${0.12*f})`;
+            ctx.fillRect(sx+(h%5)*s/6, sy+((h>>3)%5)*s/6, s*0.3, s*0.16);
+          }
+        } else {
+          // wall depth: lit edge facing adjacent floor below
+          if (ty+1<map.H && map.grid[ty+1][tx]===1 && b>0.08){
+            ctx.fillStyle=`rgba(${Math.round(r*f*2.4+25)},${Math.round(g*f*2.2+22)},${Math.round(bl*f*2+20)},0.8)`;
+            ctx.fillRect(sx, sy+s-Math.max(2,s*0.14), s+1, Math.max(2,s*0.14));
+          }
+          // cracks
+          if (h%23===0 && b>0.12){
+            ctx.strokeStyle=`rgba(0,0,0,${0.5*f})`; ctx.lineWidth=1;
+            ctx.beginPath();
+            ctx.moveTo(sx+s*0.2, sy+s*((h>>2)%8)/10);
+            ctx.lineTo(sx+s*0.5, sy+s*0.5);
+            ctx.lineTo(sx+s*0.75, sy+s*((h>>5)%9)/10);
+            ctx.stroke();
+          }
+          // scratch marks (claws) on some walls
+          if (h%31===0 && b>0.15){
+            ctx.strokeStyle=`rgba(20,5,5,${0.6*f})`; ctx.lineWidth=1;
+            for(let k=0;k<3;k++){
+              ctx.beginPath();
+              ctx.moveTo(sx+s*0.25+k*s*0.14, sy+s*0.2);
+              ctx.lineTo(sx+s*0.2+k*s*0.14, sy+s*0.75);
+              ctx.stroke();
+            }
+          }
         }
       }
     }
@@ -741,6 +974,39 @@ const Game = (() => {
       ctx.restore();
     }
 
+    // stalker silhouette at the edge of the beam
+    if (stalker){
+      const sx=stalker.x*s+cam.ox, sy=stalker.y*s+cam.oy;
+      const a=Math.min(0.85, stalker.life*1.4);
+      const jit=(Math.random()-0.5)*s*0.05;
+      ctx.save(); ctx.globalAlpha=a;
+      ctx.fillStyle='#020203';
+      ctx.beginPath(); ctx.ellipse(sx+jit,sy,s*0.34,s*1.15,0,0,Math.PI*2); ctx.fill();
+      // head, slightly tilted — wrong
+      ctx.beginPath(); ctx.ellipse(sx+jit+s*0.1, sy-s*1.05, s*0.22, s*0.3, 0.5, 0, Math.PI*2); ctx.fill();
+      ctx.shadowColor='#ff1010'; ctx.shadowBlur=10;
+      ctx.fillStyle='rgba(255,30,30,'+a+')';
+      ctx.beginPath();
+      ctx.arc(sx+jit+s*0.04, sy-s*1.08, s*0.045, 0, Math.PI*2);
+      ctx.arc(sx+jit+s*0.18, sy-s*1.02, s*0.045, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // dust motes drifting in the light
+    if (particles){
+      ctx.save();
+      particles.forEach(p=>{
+        const b=Lighting.lightAt(Math.floor(p.x),Math.floor(p.y));
+        if (b<0.15) return;
+        const px=p.x*s+cam.ox, py=p.y*s+cam.oy;
+        ctx.globalAlpha=Math.min(0.35, b*0.4);
+        ctx.fillStyle='#d8d2b8';
+        ctx.fillRect(px, py, p.s, p.s);
+      });
+      ctx.restore();
+    }
+
     // flashlight glow
     if (flashlightActive()){
       drawFlashlightGlow(s);
@@ -760,7 +1026,9 @@ const Game = (() => {
       ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,canvas.width,canvas.height);
     }
 
-    // low-sanity screen wobble
+    ctx.restore(); // end screen shake
+
+    // low-sanity red haze
     if (state.sanity<25){
       ctx.save(); ctx.globalAlpha=(25-state.sanity)/25*0.15;
       ctx.fillStyle='#400000'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.restore();
@@ -770,45 +1038,80 @@ const Game = (() => {
   function drawMonster(mo, b, dist, s){
     const sx=mo.x*s+cam.ox, sy=mo.y*s+cam.oy;
     const f=Math.min(1, Math.max(b*1.4, dist<3?0.5:0));
-    const jitter=mo.state==='chase'?(Math.random()-0.5)*s*0.08:0;
+    const chasing = mo.state==='chase';
+    const jitter=chasing?(Math.random()-0.5)*s*0.12:0;
+    const breathe=1+0.05*Math.sin(state.playtime*5);
     ctx.save();
-    // body
-    ctx.globalAlpha=Math.min(1,0.5+f*0.5);
+
+    // black smoke trailing off the body
+    ctx.globalAlpha=Math.min(0.4,0.2+f*0.25);
+    ctx.fillStyle='#000';
+    for(let k=0;k<4;k++){
+      const wx=sx+Math.sin(state.playtime*2.4+k*1.9)*s*0.35;
+      const wy=sy-s*0.2-k*s*0.28+Math.cos(state.playtime*3.1+k)*s*0.1;
+      ctx.beginPath(); ctx.ellipse(wx,wy,s*(0.34-k*0.05),s*(0.26-k*0.04),k,0,Math.PI*2); ctx.fill();
+    }
+
+    // body — a too-tall mass
+    ctx.globalAlpha=Math.min(1,0.55+f*0.45);
     ctx.fillStyle='#050507';
     ctx.beginPath();
-    ctx.ellipse(sx+jitter, sy, s*0.42, s*1.05, 0, 0, Math.PI*2); ctx.fill();
-    // long arms suggestion
-    ctx.strokeStyle='#0a0a0c'; ctx.lineWidth=s*0.18; ctx.lineCap='round';
+    ctx.ellipse(sx+jitter, sy, s*0.42*breathe, s*1.1*breathe, 0, 0, Math.PI*2); ctx.fill();
+
+    // too many arms, bent wrong
+    ctx.strokeStyle='#08080b'; ctx.lineWidth=s*0.13; ctx.lineCap='round';
+    const sway=Math.sin(state.playtime*(chasing?13:4))*s*0.12;
     ctx.beginPath();
-    ctx.moveTo(sx-s*0.3,sy); ctx.lineTo(sx-s*0.55, sy+s*0.7);
-    ctx.moveTo(sx+s*0.3,sy); ctx.lineTo(sx+s*0.55, sy+s*0.7); ctx.stroke();
-    // glowing eyes (always faintly visible)
+    ctx.moveTo(sx-s*0.3,sy-s*0.2); ctx.lineTo(sx-s*0.62+sway, sy+s*0.35); ctx.lineTo(sx-s*0.5, sy+s*0.9);
+    ctx.moveTo(sx+s*0.3,sy-s*0.2); ctx.lineTo(sx+s*0.62-sway, sy+s*0.35); ctx.lineTo(sx+s*0.5, sy+s*0.9);
+    ctx.moveTo(sx-s*0.25,sy-s*0.6); ctx.lineTo(sx-s*0.7, sy-s*0.45+sway);
+    ctx.moveTo(sx+s*0.25,sy-s*0.6); ctx.lineTo(sx+s*0.7, sy-s*0.45-sway);
+    ctx.stroke();
+
+    // head, tilted unnaturally
+    const tilt=chasing?0.65:0.3+0.1*Math.sin(state.playtime*1.7);
+    ctx.beginPath();
+    ctx.ellipse(sx+jitter+s*0.06, sy-s*1.0, s*0.26, s*0.34, tilt, 0, Math.PI*2);
+    ctx.fillStyle='#040406'; ctx.fill();
+
+    // gaping jaw when it hunts
+    if (chasing){
+      ctx.fillStyle='#2a0606';
+      ctx.beginPath();
+      ctx.ellipse(sx+jitter+s*0.1, sy-s*0.82, s*0.12, s*0.18+Math.random()*s*0.05, tilt, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // glowing eyes — always the last thing you see
     const eg=0.6+0.4*Math.sin(state.playtime*8);
-    ctx.shadowColor='#ff1010'; ctx.shadowBlur=14*eg; ctx.globalAlpha=1;
-    ctx.fillStyle='#ff2a2a';
+    ctx.shadowColor='#ff1010'; ctx.shadowBlur=(chasing?22:14)*eg; ctx.globalAlpha=1;
+    ctx.fillStyle=chasing?'#ff4030':'#ff2a2a';
+    const er=s*(chasing?0.085:0.065);
     ctx.beginPath();
-    ctx.arc(sx-s*0.13+jitter, sy-s*0.55, s*0.07, 0, Math.PI*2);
-    ctx.arc(sx+s*0.13+jitter, sy-s*0.55, s*0.07, 0, Math.PI*2);
+    ctx.arc(sx-s*0.07+jitter, sy-s*1.06, er, 0, Math.PI*2);
+    ctx.arc(sx+s*0.19+jitter, sy-s*0.98, er, 0, Math.PI*2);
     ctx.fill();
     ctx.restore();
   }
 
   function drawFlashlightGlow(s){
     const sx=player.x*s+cam.ox, sy=player.y*s+cam.oy;
-    const range=(matchTimer>0?5:9)*s;
+    const fk=0.55+0.45*flickerSmooth;          // flicker dims the beam
+    const range=(matchTimer>0?5:9)*s*fk;
     const half=0.62;
     ctx.save();
     ctx.globalCompositeOperation='lighter';
+    const warm = matchTimer>0;                  // match burns orange
     const grad=ctx.createRadialGradient(sx,sy,s*0.5, sx,sy,range);
-    grad.addColorStop(0,'rgba(255,240,205,0.30)');
-    grad.addColorStop(0.5,'rgba(255,230,180,0.10)');
+    grad.addColorStop(0,`rgba(255,${warm?200:240},${warm?140:205},${0.32*fk})`);
+    grad.addColorStop(0.5,`rgba(255,${warm?190:230},${warm?120:180},${0.11*fk})`);
     grad.addColorStop(1,'rgba(255,220,160,0)');
     ctx.fillStyle=grad;
     ctx.beginPath(); ctx.moveTo(sx,sy);
     ctx.arc(sx,sy,range, player.facing-half, player.facing+half); ctx.closePath(); ctx.fill();
     // small ambient halo
     const g2=ctx.createRadialGradient(sx,sy,0,sx,sy,s*2.6);
-    g2.addColorStop(0,'rgba(200,200,180,0.10)'); g2.addColorStop(1,'rgba(0,0,0,0)');
+    g2.addColorStop(0,`rgba(200,200,180,${0.10*fk})`); g2.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(sx,sy,s*2.6,0,Math.PI*2); ctx.fill();
     ctx.restore();
   }

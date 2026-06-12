@@ -16,9 +16,11 @@ class Player {
     this.hidden = false;
     this.hideRef = null;
     this.moving = false;
+    this.safe = 0;            // grace seconds (after leaving a locker)
   }
 
   update(dt, game) {
+    this.safe = Math.max(0, this.safe - dt);
     if (this.hidden) { this.noise = 0; this.moving = false; return; }
     const d = Input.dirKeys();
     let vx = 0, vy = 0;
@@ -30,9 +32,9 @@ class Player {
     let running = false;
     if (d.run && this.stamina > 0.02 && this.moving) {
       running = true;
-      this.stamina = Math.max(0, this.stamina - dt * 0.32);
+      this.stamina = Math.max(0, this.stamina - dt * 0.25);
     } else {
-      this.stamina = Math.min(1, this.stamina + dt * 0.18);
+      this.stamina = Math.min(1, this.stamina + dt * 0.26);
     }
     const spd = this.speed * (running ? this.runMul : 1);
 
@@ -42,7 +44,7 @@ class Player {
       const ny = this.y + vy * spd * dt;
       if (game.canWalk(nx, this.y, this.radius)) this.x = nx;
       if (game.canWalk(this.x, ny, this.radius)) this.y = ny;
-      this.noise = running ? 1.0 : 0.42;
+      this.noise = running ? 1.0 : 0.3;   // walking is much quieter than running
       this.stepTimer -= dt;
       const interval = running ? 0.28 : 0.46;
       if (this.stepTimer <= 0) { Audio.footstep(running); this.stepTimer = interval; }
@@ -77,7 +79,7 @@ class Monster {
     this.enraged = false;
     this.growlTimer = 0;
     this.investigateTimer = 0;
-    this.spawnDelay = 2.0;
+    this.spawnDelay = opts.delay || 2.0;   // grace period at chapter start
   }
 
   tileX(){ return Math.floor(this.x); }
@@ -85,10 +87,10 @@ class Monster {
 
   enrage(){ this.enraged = true; this.speed = this.baseSpeed * 1.18; this.state='chase'; }
 
-  canSee(game, p) {
+  canSee(game, p, maxRange) {
     const dx = p.x - this.x, dy = p.y - this.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 11) return false;
+    if (dist > maxRange) return false;
     const steps = Math.ceil(dist / 0.2);
     for (let i = 1; i < steps; i++) {
       const t = i / steps;
@@ -114,14 +116,14 @@ class Monster {
     let sees = false;
     if (!p.hidden) {
       const dist = Math.hypot(p.x - this.x, p.y - this.y);
-      if (this.canSee(game, p)) {
-        // light attracts it from afar; in the dark it only notices you up close
-        if (game.flashlightOn || dist < 2.6) sees = true;
-      }
+      // light no longer betrays you from across the map: ~7 tiles with the torch,
+      // and it can only notice you up close (2.4) in the dark.
+      const range = game.flashlightOn ? 7 : 2.4;
+      if (dist < range && this.canSee(game, p, range)) sees = true;
     }
     let hears = false;
     if (!p.hidden && p.noise > 0) {
-      const hearRad = 4 + p.noise * 8 + (this.enraged ? 3 : 0);
+      const hearRad = 2.5 + p.noise * 6 + (this.enraged ? 2 : 0);
       const dist = Math.hypot(p.x - this.x, p.y - this.y);
       if (dist < hearRad) hears = true;
     }
@@ -134,11 +136,11 @@ class Monster {
     } else if (this.state === 'chase') {
       this.state = 'investigate';
       this.target = this.lastSeen ? { x: Math.floor(this.lastSeen.x), y: Math.floor(this.lastSeen.y) } : null;
-      this.investigateTimer = 5;
+      this.investigateTimer = 2.5;   // gives up the hunt faster — kill the light & it loses you
     } else if (hears) {
       this.state = 'investigate';
       this.target = { x: p.tileX(), y: p.tileY() };
-      this.investigateTimer = 4;
+      this.investigateTimer = 2.2;
     }
 
     this.pathTimer -= dt;
@@ -193,9 +195,9 @@ class Monster {
       if (Math.hypot(this.x - tx, this.y - ty) < 0.25) this.path.shift();
     }
 
-    if (!p.hidden) {
+    if (!p.hidden && p.safe <= 0) {
       const dist = Math.hypot(p.x - this.x, p.y - this.y);
-      if (dist < 0.65) game.onCaught();
+      if (dist < 0.62) game.onCaught();
     }
   }
 }

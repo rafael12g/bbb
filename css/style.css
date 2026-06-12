@@ -235,6 +235,81 @@ h2{color:#bfb89c;letter-spacing:4px;margin-bottom:16px;font-size:24px;}
 .progress-wrap{width:70%;height:18px;background:#0a0a0a;border:1px solid #333;margin:14px auto;border-radius:9px;overflow:hidden;}
 .progress-bar{height:100%;width:0;background:linear-gradient(90deg,#7a5d12,#d8a13a);transition:width .1s;}
 
+/* ---------- jumpscare ---------- */
+#jumpscare{
+  position:absolute;inset:0;z-index:80;background:#000;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+/* a gaunt screaming corpse face */
+.js-face{
+  position:relative;width:66vmin;height:82vmin;
+  background:
+    radial-gradient(ellipse at 30% 30%, rgba(0,0,0,.5) 0 5%, transparent 6%),
+    radial-gradient(ellipse at 70% 30%, rgba(0,0,0,.5) 0 5%, transparent 6%),
+    radial-gradient(ellipse at 50% 44%, #d8cdbb 0%, #ad9c86 40%, #5e4f40 76%, #160f0a 100%);
+  border-radius:46% 46% 44% 44%;
+  box-shadow:0 0 150px rgba(150,0,0,.55),
+    inset 0 -9vmin 13vmin rgba(0,0,0,.65), inset 0 6vmin 9vmin rgba(0,0,0,.4),
+    inset 7vmin 0 11vmin rgba(0,0,0,.45), inset -7vmin 0 11vmin rgba(0,0,0,.45);
+  filter:contrast(1.3) saturate(.75);
+  animation:jsIn .12s ease-out, jsJitter .06s steps(2) infinite;
+}
+.js-face::before{ /* nose shadow */
+  content:"";position:absolute;top:40%;left:47%;width:6%;height:20%;
+  background:radial-gradient(ellipse at 50% 85%, rgba(0,0,0,.7), transparent 70%);
+}
+.js-eye{ /* hollow sunken socket */
+  position:absolute;top:27%;width:18%;height:13%;
+  background:radial-gradient(circle at 50% 45%, #000 0 52%, #1e0606 72%, transparent 100%);
+  border-radius:52% 52% 48% 48%;
+  box-shadow:inset 0 0 5vmin #000, 0 0 2vmin #000;
+}
+.js-eye::after{ /* dead pinprick pupil */
+  content:"";position:absolute;top:42%;left:40%;width:18%;height:18%;
+  background:#ff2a2a;border-radius:50%;box-shadow:0 0 2.5vmin #f00,0 0 5vmin rgba(255,0,0,.6);
+  animation:jsEye .11s steps(2) infinite;
+}
+.js-eye.l{left:15%;}
+.js-eye.r{right:15%;}
+
+/* screamer face variants */
+.js-face.v2{ background:radial-gradient(ellipse at 50% 40%, #efe9df 0%, #b8b0a2 40%, #20100c 100%); filter:contrast(1.5) saturate(.4);}
+.js-face.v2 .js-eye{ background:radial-gradient(circle,#fff 0%,#111 60%); box-shadow:0 0 30px #000;}
+.js-face.v2 .js-mouth{ background:radial-gradient(ellipse at 50% 18%, #4a0808 0%, #000 80%);}
+.js-face.v3{ background:radial-gradient(ellipse at 50% 38%, #3a0f0f 0%, #160404 55%, #000 100%); filter:contrast(1.4);}
+.js-face.v3 .js-eye{ background:radial-gradient(circle,#ffd23a 0%,#a06000 50%,#200 100%); box-shadow:0 0 50px #fa0;}
+
+/* fast, violent screamer-only flicker */
+#jumpscare.flash .js-face{
+  width:88vmin;height:104vmin;
+  animation:jsLunge .62s cubic-bezier(.1,.9,.2,1) forwards, jsFlash .045s steps(2) infinite;
+}
+#jumpscare.flash{ animation:scrShake .06s steps(2) infinite; }
+#jumpscare.flash::after{
+  content:"";position:absolute;inset:0;background:#fff;pointer-events:none;
+  animation:jsWhite .3s steps(3) forwards;
+}
+@keyframes jsLunge{0%{transform:scale(.06)}55%{transform:scale(1.18)}
+  75%{transform:scale(1.02)}100%{transform:scale(1.32)}}
+@keyframes jsFlash{0%{filter:invert(0) contrast(1.3)}
+  50%{filter:invert(0.22) contrast(1.7)}100%{filter:invert(0) contrast(1.3)}}
+@keyframes scrShake{0%{transform:translate(0,0)}25%{transform:translate(-1.6%,1.2%)}
+  50%{transform:translate(1.8%,-1.4%)}75%{transform:translate(-1.2%,-1%)}100%{transform:translate(1.4%,1.1%)}}
+@keyframes jsWhite{0%{opacity:.9}35%{opacity:0}55%{opacity:.45}100%{opacity:0}}
+.js-mouth{ /* gaping jagged scream */
+  position:absolute;top:57%;left:50%;transform:translateX(-50%);
+  width:42%;height:34%;
+  background:radial-gradient(ellipse at 50% 22%, #3a0606 0%, #120000 55%, #000 80%);
+  clip-path:polygon(0% 16%,7% 0%,15% 20%,24% 2%,33% 22%,42% 0%,50% 20%,58% 0%,67% 22%,
+    76% 2%,85% 20%,93% 0%,100% 16%, 95% 64%, 82% 100%, 66% 78%, 50% 100%, 34% 78%, 18% 100%, 5% 64%);
+  box-shadow:inset 0 0 4vmin #000;
+  animation:jsMouth .35s ease-out forwards;
+}
+@keyframes jsIn{from{transform:scale(.15);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes jsJitter{0%{transform:translate(0,0) scale(1)}50%{transform:translate(1.2%, -0.8%) scale(1.03)}100%{transform:translate(-1%,0.6%) scale(1.01)}}
+@keyframes jsEye{0%{opacity:1}50%{opacity:.75}}
+@keyframes jsMouth{from{height:6%}to{height:30%}}
+
 .hidden{display:none !important;}
 
 /* small screens */
