@@ -277,6 +277,58 @@ const Audio = (() => {
 
   function pulse(){ blip(660,0.1,'sine',0.15); setTimeout(()=>blip(990,0.14,'sine',0.12),100); }
 
+  // heavy door slam somewhere in the building
+  function slam(){
+    if(!ctx||!started)return;
+    const t=now();
+    const o=ctx.createOscillator();o.type='sine';
+    o.frequency.setValueAtTime(70,t);o.frequency.exponentialRampToValueAtTime(24,t+0.5);
+    const g=ctx.createGain();g.gain.value=0.0001;
+    o.connect(g);g.connect(sfxBus);
+    g.gain.linearRampToValueAtTime(0.45,t+0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.6);
+    o.start(t);o.stop(t+0.65);
+    const n=noiseSource();
+    const nf=ctx.createBiquadFilter();nf.type='lowpass';nf.frequency.value=500;
+    const ng=ctx.createGain();ng.gain.value=0.0001;
+    n.connect(nf);nf.connect(ng);ng.connect(sfxBus);
+    ng.gain.linearRampToValueAtTime(0.2,t+0.01);
+    ng.gain.exponentialRampToValueAtTime(0.0001,t+0.3);
+    n.start(t);n.stop(t+0.35);
+  }
+
+  // a child's giggle, far away — three small descending sine chirps
+  function giggle(){
+    if(!ctx||!started)return;
+    [[1175,0],[1318,110],[988,230],[880,330]].forEach(([fr,d])=>{
+      setTimeout(()=>{
+        const t=now();
+        const o=ctx.createOscillator();o.type='sine';
+        o.frequency.setValueAtTime(fr,t);
+        o.frequency.exponentialRampToValueAtTime(fr*0.82,t+0.09);
+        const g=ctx.createGain();g.gain.value=0.0001;
+        const f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=fr;f.Q.value=3;
+        o.connect(f);f.connect(g);g.connect(sfxBus);
+        g.gain.linearRampToValueAtTime(0.05,t+0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001,t+0.12);
+        o.start(t);o.stop(t+0.14);
+      },d);
+    });
+  }
+
+  // electric buzz when the flashlight struggles
+  function buzz(){
+    if(!ctx||!started)return;
+    const t=now();
+    const o=ctx.createOscillator();o.type='sawtooth';o.frequency.value=110;
+    const g=ctx.createGain();g.gain.value=0.0001;
+    const f=ctx.createBiquadFilter();f.type='highpass';f.frequency.value=900;
+    o.connect(f);f.connect(g);g.connect(sfxBus);
+    g.gain.linearRampToValueAtTime(0.05,t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.12);
+    o.start(t);o.stop(t+0.14);
+  }
+
   function powerOn(){
     if(!ctx||!started)return;
     const t=now();
@@ -306,6 +358,7 @@ const Audio = (() => {
     uiMove, uiSelect, uiBack, keypadOk, keypadErr,
     pickup, noteRustle, footstep, doorOpen, doorLocked, lockerHide,
     flashlightClick, batteryLow, growl, scream, stinger, whisper, hurt, pulse, powerOn,
+    slam, giggle, buzz,
     setMasterVolume,
     get ready(){ return started; }
   };

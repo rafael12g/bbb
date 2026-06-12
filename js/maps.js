@@ -21,6 +21,7 @@ class MapBuilder {
     this.exit = null;
     this.name = id; this.title = ""; this.intro = []; this.objective = "";
     this.dread = 0.3;
+    this.palette = { floor:[42,46,44], wall:[30,28,34] };
   }
   inBounds(x,y){ return x>=0 && y>=0 && x<this.W && y<this.H; }
   setFloor(x,y){ if(this.inBounds(x,y)) this.grid[y][x]=1; }
@@ -54,6 +55,7 @@ function ch1() {
   m.name = "Chapitre I — L'Accueil";
   m.title = "L'ACCUEIL";
   m.dread = 0.25;
+  m.palette = { floor:[44,46,50], wall:[30,28,36] };
   m.intro = [
     "Institut psychiatrique Blackwood. Fermé depuis 1987.",
     "Vous êtes Daniel Reyes, journaliste.",
@@ -106,6 +108,7 @@ function ch2() {
   m.name = "Chapitre II — Le Quartier des Patients";
   m.title = "LE QUARTIER";
   m.dread = 0.45;
+  m.palette = { floor:[46,43,38], wall:[32,27,26] };
   m.intro = [
     "Le quartier des patients. Douze chambres. Des murs griffés.",
     "Quelque chose bouge ici. Ne courez que si vous y êtes forcé —",
@@ -169,6 +172,7 @@ function ch3() {
   m.name = "Chapitre III — Le Sous-sol";
   m.title = "LE SOUS-SOL";
   m.dread = 0.6;
+  m.palette = { floor:[36,46,41], wall:[24,32,29] };
   m.intro = [
     "Le sous-sol est noyé dans le noir et l'eau croupie.",
     "Le générateur est mort. Sans courant, la chambre froide se réchauffe —",
@@ -225,6 +229,7 @@ function ch4() {
   m.name = "Chapitre IV — La Morgue";
   m.title = "LA MORGUE";
   m.dread = 0.72;
+  m.palette = { floor:[40,44,52], wall:[27,29,38] };
   m.intro = [
     "La morgue. Des casiers d'acier, du sol au plafond.",
     "Le froid vous mord. Quelque chose frappe — de l'intérieur du casier n°9.",
@@ -274,6 +279,7 @@ function ch5() {
   m.name = "Chapitre V — La Chapelle";
   m.title = "LA CHAPELLE & LE BUREAU";
   m.dread = 0.82;
+  m.palette = { floor:[48,41,33], wall:[34,27,21] };
   m.intro = [
     "La chapelle. Le seul endroit où le personnel se réfugiait.",
     "Sous l'autel : une amulette. La seule chose qu'il craigne.",
@@ -325,6 +331,7 @@ function ch6() {
   m.name = "Chapitre VI — Le Toit";
   m.title = "L'ÉVASION";
   m.dread = 1.0;
+  m.palette = { floor:[50,36,34], wall:[36,23,22] };
   m.intro = [
     "Dernier étage. Il sait que vous partez. Il est juste derrière.",
     "Le monte-charge mène au toit, mais il faut la manivelle.",

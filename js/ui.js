@@ -50,6 +50,9 @@ const UI = (() => {
     setTimeout(()=>el.classList.remove('show'), 140);
   }
 
+  function showJumpscare(){ $('jumpscare').classList.remove('hidden'); }
+  function hideJumpscare(){ $('jumpscare').classList.add('hidden'); }
+
   function blink(cb){
     const el = $('blink');
     el.style.opacity = 1;
@@ -128,7 +131,7 @@ const UI = (() => {
 
   return {
     showHUD, setObjective, setChapter, setHint, meters, toast, subtitle, prompt,
-    damageFlash, blink, vignette, hotbar,
+    damageFlash, blink, vignette, hotbar, showJumpscare, hideJumpscare,
     show, hide, openInventory, closeInventory, openJournal, closeJournal,
     openNote, closeNote
   };
