@@ -50,8 +50,24 @@ const UI = (() => {
     setTimeout(()=>el.classList.remove('show'), 140);
   }
 
-  function showJumpscare(){ $('jumpscare').classList.remove('hidden'); }
+  function showJumpscare(){
+    if (scrTimer){ clearTimeout(scrTimer); scrTimer=null; }
+    const j=$('jumpscare'); j.classList.remove('hidden','flash');
+    j.querySelector('.js-face').className='js-face';
+  }
   function hideJumpscare(){ $('jumpscare').classList.add('hidden'); }
+
+  // brief, violent screamer flash (mid-gameplay). dur in ms.
+  let scrTimer=null;
+  function screamer(dur=480, variant){
+    const j=$('jumpscare'); const face=j.querySelector('.js-face');
+    const v = variant || ('v'+(2+Math.floor(Math.random()*2)));
+    face.className='js-face '+v;
+    j.classList.remove('hidden'); j.classList.add('flash');
+    damageFlash();
+    if (scrTimer) clearTimeout(scrTimer);
+    scrTimer=setTimeout(()=>{ j.classList.add('hidden'); j.classList.remove('flash'); }, dur);
+  }
 
   function blink(cb){
     const el = $('blink');
@@ -131,7 +147,7 @@ const UI = (() => {
 
   return {
     showHUD, setObjective, setChapter, setHint, meters, toast, subtitle, prompt,
-    damageFlash, blink, vignette, hotbar, showJumpscare, hideJumpscare,
+    damageFlash, blink, vignette, hotbar, showJumpscare, hideJumpscare, screamer,
     show, hide, openInventory, closeInventory, openJournal, closeJournal,
     openNote, closeNote
   };

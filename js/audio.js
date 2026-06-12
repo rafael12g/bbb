@@ -18,8 +18,8 @@ const Audio = (() => {
     if (ctx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     ctx = new AC();
-    master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
-    sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(master);
+    master = ctx.createGain(); master.gain.value = 1.0; master.connect(ctx.destination);
+    sfxBus = ctx.createGain(); sfxBus.gain.value = 1.0; sfxBus.connect(master);
     musicBus = ctx.createGain(); musicBus.gain.value = 0.6; musicBus.connect(master);
     const len = ctx.sampleRate * 2;
     noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -329,6 +329,119 @@ const Audio = (() => {
     o.start(t);o.stop(t+0.14);
   }
 
+  // ===== SCREAMER STACK — the loud, nasty stuff =====
+
+  // a layered distorted human scream (much louder than scream())
+  function screamLoud(){
+    if(!ctx||!started)return;
+    const t=now();
+    [1,1.005,0.5,1.49].forEach((mul,i)=>{
+      const o=ctx.createOscillator(); o.type= i<2?'sawtooth':'square';
+      o.frequency.setValueAtTime(700*mul,t);
+      o.frequency.exponentialRampToValueAtTime(1700*mul,t+0.12);
+      o.frequency.exponentialRampToValueAtTime(280*mul,t+1.0);
+      const dist=ctx.createWaveShaper(); dist.curve=_distCurve(120);
+      const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1300; f.Q.value=1.4;
+      const g=ctx.createGain(); g.gain.value=0.0001;
+      o.connect(dist);dist.connect(f);f.connect(g);g.connect(sfxBus);
+      g.gain.linearRampToValueAtTime(0.5,t+0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);
+      o.start(t);o.stop(t+1.15);
+    });
+  }
+
+  // the full screamer: silence-snap → BANG → scream → high crash
+  function screamer(){
+    if(!ctx||!started)return;
+    screamLoud();
+    stinger(1.2);
+    // sub bang
+    const t=now();
+    const b=ctx.createOscillator(); b.type='sine';
+    b.frequency.setValueAtTime(120,t); b.frequency.exponentialRampToValueAtTime(28,t+0.7);
+    const bg=ctx.createGain(); bg.gain.value=0.0001;
+    const bd=ctx.createWaveShaper(); bd.curve=_distCurve(40);
+    b.connect(bd);bd.connect(bg);bg.connect(sfxBus);
+    bg.gain.linearRampToValueAtTime(0.7,t+0.01);
+    bg.gain.exponentialRampToValueAtTime(0.0001,t+0.8);
+    b.start(t);b.stop(t+0.85);
+    // shrieking metal crash
+    const n=noiseSource(); const nf=ctx.createBiquadFilter(); nf.type='highpass'; nf.frequency.value=2500;
+    const ng=ctx.createGain(); ng.gain.value=0.0001;
+    n.connect(nf);nf.connect(ng);ng.connect(sfxBus);
+    ng.gain.linearRampToValueAtTime(0.35,t+0.005);
+    ng.gain.exponentialRampToValueAtTime(0.0001,t+0.7);
+    n.start(t);n.stop(t+0.75);
+  }
+
+  // rising tension tone that precedes a scare (call ~1s before)
+  function riser(dur=1.0){
+    if(!ctx||!started)return;
+    const t=now();
+    const o=ctx.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(80,t);
+    o.frequency.exponentialRampToValueAtTime(900,t+dur);
+    const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.setValueAtTime(300,t);
+    f.frequency.exponentialRampToValueAtTime(3000,t+dur);
+    const g=ctx.createGain(); g.gain.value=0.0001;
+    o.connect(f);f.connect(g);g.connect(sfxBus);
+    g.gain.linearRampToValueAtTime(0.18,t+dur*0.8);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.1);
+    o.start(t);o.stop(t+dur+0.15);
+    // shimmer noise
+    const n=noiseSource(); const nf=ctx.createBiquadFilter(); nf.type='bandpass'; nf.frequency.setValueAtTime(400,t);
+    nf.frequency.exponentialRampToValueAtTime(4000,t+dur); nf.Q.value=2;
+    const ng=ctx.createGain(); ng.gain.value=0.0001;
+    n.connect(nf);nf.connect(ng);ng.connect(sfxBus);
+    ng.gain.linearRampToValueAtTime(0.1,t+dur*0.9);
+    ng.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.1);
+    n.start(t);n.stop(t+dur+0.15);
+  }
+
+  // wet breath right behind you
+  function breath(){
+    if(!ctx||!started)return;
+    const t=now();
+    const n=noiseSource();
+    const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=600; f.Q.value=1.2;
+    const g=ctx.createGain(); g.gain.value=0.0001;
+    n.connect(f);f.connect(g);g.connect(sfxBus);
+    // inhale
+    g.gain.linearRampToValueAtTime(0.16,t+0.35);
+    f.frequency.linearRampToValueAtTime(1100,t+0.35);
+    // exhale
+    g.gain.linearRampToValueAtTime(0.05,t+0.5);
+    g.gain.linearRampToValueAtTime(0.20,t+0.9);
+    f.frequency.linearRampToValueAtTime(450,t+0.95);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+1.2);
+    n.start(t);n.stop(t+1.25);
+  }
+
+  // metal scrape / nails dragged on steel
+  function scrape(){
+    if(!ctx||!started)return;
+    const t=now();
+    const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=2200;
+    const lfo=ctx.createOscillator(); lfo.type='square'; lfo.frequency.value=42;
+    const lg=ctx.createGain(); lg.gain.value=400; lfo.connect(lg); lg.connect(o.frequency);
+    const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=3000; f.Q.value=8;
+    const g=ctx.createGain(); g.gain.value=0.0001;
+    o.connect(f);f.connect(g);g.connect(sfxBus);
+    g.gain.linearRampToValueAtTime(0.12,t+0.05);
+    g.gain.linearRampToValueAtTime(0.08,t+0.5);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.7);
+    o.start(t);lfo.start(t);o.stop(t+0.72);lfo.stop(t+0.72);
+  }
+
+  // sudden snap of total quiet then a tick — the "calm before"
+  function holdBreath(){
+    if(!droneGain||!ctx)return;
+    const t=now();
+    droneGain.gain.cancelScheduledValues(t);
+    droneGain.gain.setTargetAtTime(0.05, t, 0.15);
+    droneGain.gain.setTargetAtTime(0.5, t+1.3, 0.6);
+  }
+
   function powerOn(){
     if(!ctx||!started)return;
     const t=now();
@@ -358,7 +471,7 @@ const Audio = (() => {
     uiMove, uiSelect, uiBack, keypadOk, keypadErr,
     pickup, noteRustle, footstep, doorOpen, doorLocked, lockerHide,
     flashlightClick, batteryLow, growl, scream, stinger, whisper, hurt, pulse, powerOn,
-    slam, giggle, buzz,
+    slam, giggle, buzz, screamer, screamLoud, riser, breath, scrape, holdBreath,
     setMasterVolume,
     get ready(){ return started; }
   };

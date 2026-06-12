@@ -257,6 +257,19 @@ h2{color:#bfb89c;letter-spacing:4px;margin-bottom:16px;font-size:24px;}
 }
 .js-eye.l{left:26%;transform:rotate(-12deg);}
 .js-eye.r{right:26%;transform:rotate(12deg);}
+
+/* screamer face variants */
+.js-face.v2{ background:radial-gradient(ellipse at 50% 40%, #efe9df 0%, #b8b0a2 40%, #20100c 100%); filter:contrast(1.5) saturate(.4);}
+.js-face.v2 .js-eye{ background:radial-gradient(circle,#fff 0%,#111 60%); box-shadow:0 0 30px #000;}
+.js-face.v2 .js-mouth{ background:radial-gradient(ellipse at 50% 18%, #4a0808 0%, #000 80%);}
+.js-face.v3{ background:radial-gradient(ellipse at 50% 38%, #3a0f0f 0%, #160404 55%, #000 100%); filter:contrast(1.4);}
+.js-face.v3 .js-eye{ background:radial-gradient(circle,#ffd23a 0%,#a06000 50%,#200 100%); box-shadow:0 0 50px #fa0;}
+
+/* fast, violent screamer-only flicker */
+#jumpscare.flash .js-face{ animation:jsIn .05s ease-out, jsFlash .05s steps(2) infinite;}
+@keyframes jsFlash{0%{transform:translate(0,0) scale(1.02);filter:invert(0)}
+  50%{transform:translate(2.5%,-2%) scale(1.07);filter:invert(0.15)}
+  100%{transform:translate(-2%,1.5%) scale(1.04);filter:invert(0)}}
 .js-mouth{
   position:absolute;top:56%;left:50%;transform:translateX(-50%);
   width:46%;height:26%;

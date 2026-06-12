@@ -157,9 +157,10 @@ function ch2() {
   m.locker(20,16); m.locker(33,17); m.locker(7,21);
   m.mob(46,16,{enabled:true,speed:2.9,roam:[[46,16],[6,16],[25,9],[25,24]]});
   m.trigger({ x:12,y:16, r:1.4, action:[
-    {type:'stinger',intensity:0.7},
-    {type:'subtitle',text:"Un patient était assis là. Vous clignez des yeux. La chaise est vide."},
-    {type:'sanity',amount:-6} ] });
+    {type:'screamer',text:"UN PATIENT VOUS SAUTE AU VISAGE EN HURLANT. Puis la chaise est vide.",sanity:9},
+    {type:'sanity',amount:-4} ] });
+  m.trigger({ x:40,y:16, r:1.4, action:[
+    {type:'scrape'},{type:'subtitle',text:"Des ongles raclent l'acier, quelque part dans le couloir."},{type:'sanity',amount:-4} ] });
   m.trigger({ x:25,y:16, r:1.4, action:[
     {type:'subtitle',text:"« Il a faim », murmurent les murs. Tous en même temps."},
     {type:'sound',name:'whisper'},{type:'sanity',amount:-5} ] });
@@ -220,6 +221,8 @@ function ch3() {
   m.mob(45,5,{enabled:true,speed:3.0,roam:[[45,5],[12,14],[24,30],[6,22]]});
   m.trigger({ x:12,y:14, r:1.4, action:[
     {type:'sound',name:'whisper'},{type:'subtitle',text:"De l'eau goutte. Puis des pas. Lourds. Mouillés."},{type:'sanity',amount:-6} ] });
+  m.trigger({ x:24,y:30, r:1.6, action:[
+    {type:'screamer',text:"UNE MAIN BLÊME JAILLIT DE L'EAU et vous agrippe la cheville. Vous vous dégagez.",sanity:10} ] });
   return m;
 },
 
@@ -265,9 +268,11 @@ function ch4() {
   m.locker(10,20); m.locker(35,9); m.locker(30,16);
   m.mob(38,9,{enabled:true,speed:3.15,roam:[[38,9],[12,14],[24,20],[33,9]]});
   m.trigger({ x:38,y:14, r:1.8, action:[
-    {type:'stinger',intensity:1.0},
-    {type:'subtitle',text:"Le casier n°9 explose de l'intérieur. La table est vide. Cours."},
-    {type:'sanity',amount:-14},{type:'enrage'} ] });
+    {type:'scrape'},
+    {type:'screamer',text:"LE CASIER N°9 EXPLOSE — UNE CHOSE EN JAILLIT DROIT SUR VOUS. La table est vide. COURS.",sanity:14},
+    {type:'enrage'} ] });
+  m.trigger({ x:16,y:15, r:1.4, action:[
+    {type:'breath'},{type:'subtitle',text:"Un casier s'entrouvre tout seul derrière vous."},{type:'sanity',amount:-5} ] });
   m.trigger({ x:24,y:14, r:1.4, action:[
     {type:'sound',name:'whisper'},{type:'subtitle',text:"On vous appelle Daniel. Ne répondez pas."},{type:'sanity',amount:-6} ] });
   return m;
@@ -318,8 +323,8 @@ function ch5() {
   m.locker(10,24); m.locker(22,10); m.locker(26,20);
   m.mob(35,15,{enabled:true,speed:3.25,roam:[[35,15],[12,20],[12,6],[24,20]]});
   m.trigger({ x:31,y:9, r:1.6, action:[
-    {type:'subtitle',text:"L'ombre tassée sur le fauteuil se lève. Le directeur n'a plus de visage."},
-    {type:'sanity',amount:-10},{type:'enrage'} ] });
+    {type:'screamer',text:"L'OMBRE SUR LE FAUTEUIL BONDIT — le directeur n'a plus de visage, seulement une bouche.",sanity:12},
+    {type:'enrage'} ] });
   m.trigger({ x:12,y:18, r:1.6, action:[
     {type:'sound',name:'whisper'},{type:'subtitle',text:"Les bancs sont pleins. Vous regardez à nouveau : vides."},{type:'sanity',amount:-8} ] });
   return m;
@@ -362,7 +367,9 @@ function ch6() {
   m.locker(10,15); m.locker(28,12); m.locker(22,24);
   m.mob(8,15,{enabled:true,speed:3.4,roam:[[8,15],[30,15],[14,8],[22,24]]});
   m.trigger({ x:8,y:15, r:1.3, action:[
-    {type:'growl'},{type:'subtitle',text:"IL EST DERRIÈRE VOUS. COUREZ."},{type:'enrage'} ] });
+    {type:'screamer',text:"IL EST DERRIÈRE VOUS. COUREZ.",sanity:8},{type:'enrage'} ] });
+  m.trigger({ x:24,y:15, r:1.4, action:[
+    {type:'scrape'},{type:'subtitle',text:"Les murs se rapprochent. Ou bien c'est lui."},{type:'sanity',amount:-5} ] });
   return m;
 }
 

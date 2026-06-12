@@ -53,6 +53,9 @@ const Game = (() => {
   let particles = null;       // dust motes in the beam
   let caughtLock = false;     // prevents double-death
   let sanityFilterStep = -1;  // cached css filter bucket
+  let screamerCD = 18;        // cooldown before next random screamer
+  let pendingScare = 0;       // >0 = riser armed, counting down to the bang
+  let behindCD = 0;           // cooldown for "breath behind you"
 
   // ---------- setup ----------
   function init(cv){
@@ -123,6 +126,7 @@ const Game = (() => {
     ambientTimer = 10 + Math.random()*10;
     stalker = null; stalkerTimer = 16 + Math.random()*14;
     particles = null; caughtLock = false;
+    screamerCD = 16 + Math.random()*14; pendingScare = 0; behindCD = 0;
     sanityFilterStep = -1; canvas.style.filter = '';
     // snapshot for retry
     chapterStartSnap = {
@@ -263,11 +267,56 @@ const Game = (() => {
     fearUpdate(dt);
   }
 
+  // fire a full screamer right now (mid-gameplay jolt, not a death)
+  const SCARE_LINES = [
+    "QUELQUE CHOSE A HURLÉ DANS VOTRE OREILLE.",
+    "Un visage. Juste devant le vôtre. Puis plus rien.",
+    "Vous n'êtes pas seul. Vous ne l'avez jamais été.",
+    "IL VOUS A SOURI.",
+  ];
+  function doScreamer(opts={}){
+    UI.screamer(opts.dur||500, opts.variant);
+    Audio.screamer();
+    shake = Math.max(shake, opts.shake||24);
+    flickerHold = Math.max(flickerHold, 0.9);
+    state.sanity = Math.max(0, state.sanity - (opts.sanity!=null?opts.sanity:10));
+    if (opts.text!==null)
+      UI.subtitle(opts.text || SCARE_LINES[Math.floor(Math.random()*SCARE_LINES.length)], 2200);
+    screamerCD = (opts.cd!=null?opts.cd : (24 + Math.random()*22));
+  }
+  function armScare(){
+    Audio.holdBreath(); Audio.riser(0.9);
+    pendingScare = 0.92; screamerCD = 999;  // held until it fires
+  }
+
   // ---------- fear systems: flicker, ambient events, stalker ----------
   function fearUpdate(dt){
     // flashlight flicker — worse when IT is near
     const near = monster && map.monster && map.monster.enabled
       ? Math.hypot(player.x-monster.x, player.y-monster.y) : 99;
+
+    // ===== screamer scheduler =====
+    screamerCD -= dt;
+    if (pendingScare > 0){
+      pendingScare -= dt;
+      if (pendingScare <= 0) doScreamer();
+    } else if (screamerCD <= 0){
+      const tension = (1 - state.sanity/100) + (near < 11 ? 0.6 : 0) + map.dread*0.5;
+      if (Math.random() < dt * (0.05 + 0.12*tension)) armScare();
+    }
+
+    // ===== breath right behind you =====
+    behindCD -= dt;
+    if (behindCD <= 0 && near < 3.8 && monster.state!=='repelled'){
+      // is it behind the way you're facing?
+      const ang = Math.atan2(monster.y-player.y, monster.x-player.x);
+      let diff = Math.abs(((ang - player.facing + Math.PI)%(Math.PI*2)) - Math.PI);
+      if (diff > 1.9){ // it's behind you and you can't see it
+        Audio.breath(); shake = Math.max(shake, 3); behindCD = 6 + Math.random()*4;
+        if (Math.random() < 0.4) doScreamer({dur:340, sanity:6, text:"Un souffle chaud. Juste derrière votre nuque.", cd:20});
+        else UI.subtitle("Vous sentez une respiration dans votre dos...", 1800);
+      }
+    }
     let target = 1;
     if (flickerHold > 0){ flickerHold -= dt; target = 0.25 + Math.random()*0.5; }
     else if (near < 8 && flashlightActive()){
@@ -321,9 +370,14 @@ const Game = (() => {
       stalker.life -= dt;
       if (stalker.life <= 0){
         stalker = null;
-        Audio.stinger(0.35); shake = Math.max(shake, 5);
-        state.sanity = Math.max(0, state.sanity - 4);
-        if (Math.random()<0.5) UI.subtitle("Il y avait quelqu'un. Il n'y a plus personne.", 2000);
+        if (Math.random() < 0.45 && screamerCD < 900){
+          // the silhouette lunges at the screen
+          doScreamer({dur:380, sanity:7, text:"Elle s'est jetée sur vous. Le faisceau n'éclaire que le mur.", cd:18});
+        } else {
+          Audio.stinger(0.35); shake = Math.max(shake, 5);
+          state.sanity = Math.max(0, state.sanity - 4);
+          if (Math.random()<0.5) UI.subtitle("Il y avait quelqu'un. Il n'y a plus personne.", 2000);
+        }
       }
     }
 
@@ -639,6 +693,9 @@ const Game = (() => {
         case 'toast': UI.toast(a.text, a.kind); break;
         case 'subtitle': UI.subtitle(a.text); break;
         case 'stinger': Audio.stinger(a.intensity||1); UI.damageFlash(); shake = Math.max(shake, 6+8*(a.intensity||1)); break;
+        case 'screamer': doScreamer({ dur:a.dur||560, sanity:a.sanity!=null?a.sanity:12, text:a.text!==undefined?a.text:undefined, shake:a.shake||26 }); break;
+        case 'scrape': Audio.scrape(); break;
+        case 'breath': Audio.breath(); break;
         case 'sound': if (Audio[a.name]) Audio[a.name](); break;
         case 'growl': Audio.growl(0.2); break;
         case 'sanity': state.sanity=Math.max(0,Math.min(100,state.sanity+(a.amount||0))); break;
