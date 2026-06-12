@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>BLACKWOOD — Survival Horror</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+
+  <!-- Vignette / film grain overlays -->
+  <div id="vignette"></div>
+  <div id="grain"></div>
+  <div id="damage-flash"></div>
+  <div id="blink"></div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <div class="meter" id="sanity-meter" title="Santé mentale">
+        <span class="meter-label">🧠</span>
+        <div class="meter-bar"><div class="meter-fill" id="sanity-fill"></div></div>
+      </div>
+      <div class="meter" id="battery-meter" title="Batterie">
+        <span class="meter-label">🔦</span>
+        <div class="meter-bar"><div class="meter-fill" id="battery-fill"></div></div>
+      </div>
+      <div class="meter" id="stamina-meter" title="Endurance">
+        <span class="meter-label">🫁</span>
+        <div class="meter-bar"><div class="meter-fill" id="stamina-fill"></div></div>
+      </div>
+    </div>
+    <div id="hud-objective"></div>
+    <div id="hud-hint"></div>
+    <div id="hud-chapter"></div>
+    <div id="hud-toast"></div>
+    <div id="hotbar"></div>
+  </div>
+
+  <!-- Subtitles / messages -->
+  <div id="subtitle" class="hidden"></div>
+
+  <!-- Interaction prompt -->
+  <div id="prompt" class="hidden"></div>
+
+  <!-- Main Menu -->
+  <div id="menu" class="screen">
+    <div class="menu-inner">
+      <h1 class="title-glow">BLACKWOOD</h1>
+      <p class="subtitle-text">Institut psychiatrique — Dossier 0049</p>
+      <div class="menu-buttons">
+        <button id="btn-new">Nouvelle partie</button>
+        <button id="btn-continue" disabled>Continuer</button>
+        <button id="btn-howto">Comment jouer</button>
+        <button id="btn-credits">À propos</button>
+      </div>
+      <p class="warn">⚠ Ce jeu contient des scènes pouvant heurter. Jouez au casque, dans le noir, pour l'expérience complète.</p>
+      <p class="hint-small">Cliquez n'importe où pour activer le son.</p>
+    </div>
+  </div>
+
+  <!-- How to play -->
+  <div id="howto" class="screen hidden">
+    <div class="menu-inner panel">
+      <h2>Comment jouer</h2>
+      <ul class="controls-list">
+        <li><b>Z Q S D</b> / Flèches — Se déplacer</li>
+        <li><b>Souris</b> — Orienter la lampe torche</li>
+        <li><b>Maj</b> — Courir (consomme l'endurance)</li>
+        <li><b>E</b> — Interagir / Ramasser / Ouvrir</li>
+        <li><b>F</b> — Allumer / éteindre la lampe</li>
+        <li><b>Espace</b> — Se cacher / sortir d'un casier</li>
+        <li><b>1‑6</b> — Utiliser un objet de la barre</li>
+        <li><b>I</b> — Inventaire &nbsp; <b>J</b> — Journal &nbsp; <b>Tab</b> — Objectifs</li>
+        <li><b>Échap</b> — Pause</li>
+      </ul>
+      <div class="tips">
+        <p>• Dans le noir, votre santé mentale chute. La lumière vous protège mais attire <i>l'Autre</i>.</p>
+        <p>• Courir et claquer les portes fait du bruit. Le bruit le rapproche.</p>
+        <p>• Si vous l'entendez tout près, éteignez la lampe et cachez‑vous.</p>
+        <p>• La partie est sauvegardée automatiquement à chaque chapitre.</p>
+      </div>
+      <button class="back-btn" data-back>Retour</button>
+    </div>
+  </div>
+
+  <!-- Credits -->
+  <div id="credits" class="screen hidden">
+    <div class="menu-inner panel">
+      <h2>À propos</h2>
+      <p>BLACKWOOD est un survival‑horror entièrement jouable dans le navigateur.</p>
+      <p>Aucune installation, aucune dépendance : moteur, éclairage, IA et audio sont générés en temps réel.</p>
+      <p class="hint-small">Audio synthétisé via Web Audio API. Rendu Canvas 2D.</p>
+      <button class="back-btn" data-back>Retour</button>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="screen hidden">
+    <div class="menu-inner panel">
+      <h2>Pause</h2>
+      <div class="menu-buttons">
+        <button id="btn-resume">Reprendre</button>
+        <button id="btn-restart-chapter">Recommencer le chapitre</button>
+        <button id="btn-quit">Quitter au menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inventory -->
+  <div id="inventory" class="screen hidden">
+    <div class="menu-inner panel wide">
+      <h2>Inventaire</h2>
+      <div id="inv-grid"></div>
+      <div id="inv-detail"></div>
+      <button class="back-btn" data-close-overlay>Fermer (I)</button>
+    </div>
+  </div>
+
+  <!-- Journal -->
+  <div id="journal" class="screen hidden">
+    <div class="menu-inner panel wide">
+      <h2>Journal — Documents trouvés</h2>
+      <div id="journal-list"></div>
+      <div id="journal-read"></div>
+      <button class="back-btn" data-close-overlay>Fermer (J)</button>
+    </div>
+  </div>
+
+  <!-- Note reader (full screen when picking up) -->
+  <div id="note-reader" class="screen hidden">
+    <div class="paper">
+      <div id="note-content"></div>
+      <button id="note-close" class="back-btn">Reposer le document (E)</button>
+    </div>
+  </div>
+
+  <!-- Keypad puzzle -->
+  <div id="keypad" class="screen hidden">
+    <div class="keypad-box">
+      <div id="keypad-title">Clavier à code</div>
+      <div id="keypad-display">----</div>
+      <div id="keypad-grid"></div>
+      <button class="back-btn" id="keypad-close">Annuler (Échap)</button>
+    </div>
+  </div>
+
+  <!-- Generic puzzle host -->
+  <div id="puzzle" class="screen hidden">
+    <div class="menu-inner panel wide" id="puzzle-host"></div>
+  </div>
+
+  <!-- Death screen -->
+  <div id="death" class="screen hidden">
+    <div class="menu-inner">
+      <h1 class="death-title">VOUS ÊTES MORT</h1>
+      <p id="death-msg"></p>
+      <div class="menu-buttons">
+        <button id="btn-retry">Réessayer</button>
+        <button id="btn-death-menu">Menu principal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chapter card / cutscene text -->
+  <div id="cutscene" class="screen hidden">
+    <div id="cutscene-text"></div>
+    <button id="cutscene-skip">Continuer ▸</button>
+  </div>
+
+  <!-- Win screen -->
+  <div id="win" class="screen hidden">
+    <div class="menu-inner">
+      <h1 class="title-glow">VOUS AVEZ SURVÉCU</h1>
+      <p id="win-stats"></p>
+      <button id="btn-win-menu">Menu principal</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/save.js"></script>
+<script src="js/items.js"></script>
+<script src="js/notes.js"></script>
+<script src="js/pathfind.js"></script>
+<script src="js/lighting.js"></script>
+<script src="js/maps.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/puzzles.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
