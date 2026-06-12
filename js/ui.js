@@ -75,6 +75,14 @@ const UI = (() => {
     setTimeout(()=>{ el.style.opacity = 0; if(cb) cb(); }, 130);
   }
 
+  // hard cut to black for `ms` (the beat of silence before a screamer)
+  function blackout(ms){
+    const el = $('blink');
+    el.style.transition = 'none';
+    el.style.opacity = 1;
+    setTimeout(()=>{ el.style.transition = 'opacity .12s'; el.style.opacity = 0; }, ms);
+  }
+
   function vignette(intensity){ // 0..1 dread
     $('vignette').style.background =
       `radial-gradient(ellipse at center, rgba(0,0,0,0) ${35-intensity*15}%,`+
@@ -147,7 +155,7 @@ const UI = (() => {
 
   return {
     showHUD, setObjective, setChapter, setHint, meters, toast, subtitle, prompt,
-    damageFlash, blink, vignette, hotbar, showJumpscare, hideJumpscare, screamer,
+    damageFlash, blink, blackout, vignette, hotbar, showJumpscare, hideJumpscare, screamer,
     show, hide, openInventory, closeInventory, openJournal, closeJournal,
     openNote, closeNote
   };

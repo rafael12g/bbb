@@ -126,7 +126,7 @@ const Game = (() => {
     ambientTimer = 10 + Math.random()*10;
     stalker = null; stalkerTimer = 16 + Math.random()*14;
     particles = null; caughtLock = false;
-    screamerCD = 16 + Math.random()*14; pendingScare = 0; behindCD = 0;
+    screamerCD = 45 + Math.random()*35; pendingScare = 0; behindCD = 0;
     sanityFilterStep = -1; canvas.style.filter = '';
     // snapshot for retry
     chapterStartSnap = {
@@ -275,18 +275,23 @@ const Game = (() => {
     "IL VOUS A SOURI.",
   ];
   function doScreamer(opts={}){
-    UI.screamer(opts.dur||500, opts.variant);
-    Audio.screamer();
-    shake = Math.max(shake, opts.shake||24);
-    flickerHold = Math.max(flickerHold, 0.9);
+    // total blackout for a beat... then the face slams into the screen
+    Audio.holdBreath();
+    UI.blackout(200);
+    setTimeout(()=>{
+      UI.screamer(opts.dur||620, opts.variant);
+      Audio.screamer();
+    }, 190);
+    shake = Math.max(shake, opts.shake||34);
+    flickerHold = Math.max(flickerHold, 1.4);
     state.sanity = Math.max(0, state.sanity - (opts.sanity!=null?opts.sanity:10));
     if (opts.text!==null)
       UI.subtitle(opts.text || SCARE_LINES[Math.floor(Math.random()*SCARE_LINES.length)], 2200);
-    screamerCD = (opts.cd!=null?opts.cd : (24 + Math.random()*22));
+    screamerCD = (opts.cd!=null?opts.cd : (55 + Math.random()*45));
   }
   function armScare(){
-    Audio.holdBreath(); Audio.riser(0.9);
-    pendingScare = 0.92; screamerCD = 999;  // held until it fires
+    Audio.holdBreath(); Audio.riser(1.25);
+    pendingScare = 1.25; screamerCD = 999;  // held until it fires
   }
 
   // ---------- fear systems: flicker, ambient events, stalker ----------
@@ -302,7 +307,7 @@ const Game = (() => {
       if (pendingScare <= 0) doScreamer();
     } else if (screamerCD <= 0){
       const tension = (1 - state.sanity/100) + (near < 11 ? 0.6 : 0) + map.dread*0.5;
-      if (Math.random() < dt * (0.05 + 0.12*tension)) armScare();
+      if (Math.random() < dt * (0.03 + 0.07*tension)) armScare();
     }
 
     // ===== breath right behind you =====
@@ -312,8 +317,8 @@ const Game = (() => {
       const ang = Math.atan2(monster.y-player.y, monster.x-player.x);
       let diff = Math.abs(((ang - player.facing + Math.PI)%(Math.PI*2)) - Math.PI);
       if (diff > 1.9){ // it's behind you and you can't see it
-        Audio.breath(); shake = Math.max(shake, 3); behindCD = 6 + Math.random()*4;
-        if (Math.random() < 0.4) doScreamer({dur:340, sanity:6, text:"Un souffle chaud. Juste derrière votre nuque.", cd:20});
+        Audio.breath(); shake = Math.max(shake, 3); behindCD = 9 + Math.random()*6;
+        if (Math.random() < 0.25) doScreamer({dur:420, sanity:6, text:"Un souffle chaud. Juste derrière votre nuque.", cd:40});
         else UI.subtitle("Vous sentez une respiration dans votre dos...", 1800);
       }
     }
@@ -356,7 +361,7 @@ const Game = (() => {
     // stalker apparition — a silhouette at the edge of your beam
     stalkerTimer -= dt;
     if (!stalker && stalkerTimer <= 0 && !player.hidden){
-      stalkerTimer = 20 + Math.random()*18;
+      stalkerTimer = 30 + Math.random()*26;
       const a = player.facing + (Math.random()-0.5)*0.7;
       const d = 5.5 + Math.random()*2;
       const sx = player.x + Math.cos(a)*d, sy = player.y + Math.sin(a)*d;
@@ -370,9 +375,9 @@ const Game = (() => {
       stalker.life -= dt;
       if (stalker.life <= 0){
         stalker = null;
-        if (Math.random() < 0.45 && screamerCD < 900){
+        if (Math.random() < 0.3 && screamerCD < 900){
           // the silhouette lunges at the screen
-          doScreamer({dur:380, sanity:7, text:"Elle s'est jetée sur vous. Le faisceau n'éclaire que le mur.", cd:18});
+          doScreamer({dur:460, sanity:7, text:"Elle s'est jetée sur vous. Le faisceau n'éclaire que le mur.", cd:45});
         } else {
           Audio.stinger(0.35); shake = Math.max(shake, 5);
           state.sanity = Math.max(0, state.sanity - 4);
@@ -615,6 +620,7 @@ const Game = (() => {
   function toggleHide(){
     if (player.hidden){
       player.hidden=false; hideLocker.occupied=false; hideLocker=null;
+      player.safe = 1.3;            // brief grace so it can't camp the locker
       Audio.lockerHide(); UI.prompt(null);
       return;
     }

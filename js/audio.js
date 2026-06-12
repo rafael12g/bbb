@@ -350,10 +350,29 @@ const Audio = (() => {
     });
   }
 
-  // the full screamer: silence-snap → BANG → scream → high crash
+  // piercing high shriek — the layer that makes you jump
+  function shriek(){
+    if(!ctx||!started)return;
+    const t=now();
+    [2600,3100].forEach((fr,i)=>{
+      const o=ctx.createOscillator(); o.type='square';
+      o.frequency.setValueAtTime(fr,t);
+      o.frequency.exponentialRampToValueAtTime(fr*1.7,t+0.09);
+      o.frequency.exponentialRampToValueAtTime(fr*0.5,t+0.55);
+      const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=fr*1.2; f.Q.value=3;
+      const g=ctx.createGain(); g.gain.value=0.0001;
+      o.connect(f);f.connect(g);g.connect(sfxBus);
+      g.gain.linearRampToValueAtTime(0.22,t+0.012+i*0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.6);
+      o.start(t);o.stop(t+0.65);
+    });
+  }
+
+  // the full screamer: silence-snap → BANG → scream → shriek → high crash
   function screamer(){
     if(!ctx||!started)return;
     screamLoud();
+    shriek();
     stinger(1.2);
     // sub bang
     const t=now();
@@ -471,7 +490,7 @@ const Audio = (() => {
     uiMove, uiSelect, uiBack, keypadOk, keypadErr,
     pickup, noteRustle, footstep, doorOpen, doorLocked, lockerHide,
     flashlightClick, batteryLow, growl, scream, stinger, whisper, hurt, pulse, powerOn,
-    slam, giggle, buzz, screamer, screamLoud, riser, breath, scrape, holdBreath,
+    slam, giggle, buzz, screamer, screamLoud, shriek, riser, breath, scrape, holdBreath,
     setMasterVolume,
     get ready(){ return started; }
   };

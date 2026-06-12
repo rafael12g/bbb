@@ -266,10 +266,22 @@ h2{color:#bfb89c;letter-spacing:4px;margin-bottom:16px;font-size:24px;}
 .js-face.v3 .js-eye{ background:radial-gradient(circle,#ffd23a 0%,#a06000 50%,#200 100%); box-shadow:0 0 50px #fa0;}
 
 /* fast, violent screamer-only flicker */
-#jumpscare.flash .js-face{ animation:jsIn .05s ease-out, jsFlash .05s steps(2) infinite;}
-@keyframes jsFlash{0%{transform:translate(0,0) scale(1.02);filter:invert(0)}
-  50%{transform:translate(2.5%,-2%) scale(1.07);filter:invert(0.15)}
-  100%{transform:translate(-2%,1.5%) scale(1.04);filter:invert(0)}}
+#jumpscare.flash .js-face{
+  width:88vmin;height:104vmin;
+  animation:jsLunge .62s cubic-bezier(.1,.9,.2,1) forwards, jsFlash .045s steps(2) infinite;
+}
+#jumpscare.flash{ animation:scrShake .06s steps(2) infinite; }
+#jumpscare.flash::after{
+  content:"";position:absolute;inset:0;background:#fff;pointer-events:none;
+  animation:jsWhite .3s steps(3) forwards;
+}
+@keyframes jsLunge{0%{transform:scale(.06)}55%{transform:scale(1.18)}
+  75%{transform:scale(1.02)}100%{transform:scale(1.32)}}
+@keyframes jsFlash{0%{filter:invert(0) contrast(1.3)}
+  50%{filter:invert(0.22) contrast(1.7)}100%{filter:invert(0) contrast(1.3)}}
+@keyframes scrShake{0%{transform:translate(0,0)}25%{transform:translate(-1.6%,1.2%)}
+  50%{transform:translate(1.8%,-1.4%)}75%{transform:translate(-1.2%,-1%)}100%{transform:translate(1.4%,1.1%)}}
+@keyframes jsWhite{0%{opacity:.9}35%{opacity:0}55%{opacity:.45}100%{opacity:0}}
 .js-mouth{
   position:absolute;top:56%;left:50%;transform:translateX(-50%);
   width:46%;height:26%;

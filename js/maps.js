@@ -125,6 +125,10 @@ function ch2() {
     m.door(x+2,15,{}); m.vcorr(16,14,x+2);
     m.deco(x+1,9,'bed'); m.deco(x+3,9,'bed');
   }
+  // service corridor along the back of the north rooms — a flanking route
+  m.hcorr(8,43,6);
+  m.vcorr(6,8,8); m.vcorr(6,8,22); m.vcorr(6,8,36); m.vcorr(6,8,43);
+  m.item(30,6,'battery',1);
   for (let i=0;i<6;i++){
     const x=6+i*7;
     m.room(x,20,5,6);
@@ -154,8 +158,9 @@ function ch2() {
   m.door(4,28,{locked:true,key:'key_morgue',label:"Escalier vers le sous-sol"});
   m.hcorr(4,5,28); m.vcorr(17,28,5);
   m.setExit(3,29);
-  m.locker(20,16); m.locker(33,17); m.locker(7,21);
-  m.mob(46,16,{enabled:true,speed:2.9,roam:[[46,16],[6,16],[25,9],[25,24]]});
+  m.locker(20,16); m.locker(33,17); m.locker(7,21); m.locker(43,17);
+  // spawns far from the player AND from the pharmacy keypad; slower; 6s of grace
+  m.mob(29,23,{enabled:true,speed:2.55,delay:6,roam:[[29,23],[40,16],[22,9],[10,16]]});
   m.trigger({ x:12,y:16, r:1.4, action:[
     {type:'screamer',text:"UN PATIENT VOUS SAUTE AU VISAGE EN HURLANT. Puis la chaise est vide.",sanity:9},
     {type:'sanity',amount:-4} ] });
@@ -321,7 +326,7 @@ function ch5() {
   m.hcorr(28,34,26); m.vcorr(15,26,28);
   m.setExit(37,26,(st)=>st.inv.has('hand_crank'));
   m.locker(10,24); m.locker(22,10); m.locker(26,20);
-  m.mob(35,15,{enabled:true,speed:3.25,roam:[[35,15],[12,20],[12,6],[24,20]]});
+  m.mob(31,15,{enabled:true,speed:3.25,roam:[[31,15],[12,20],[12,6],[24,20]]});
   m.trigger({ x:31,y:9, r:1.6, action:[
     {type:'screamer',text:"L'OMBRE SUR LE FAUTEUIL BONDIT — le directeur n'a plus de visage, seulement une bouche.",sanity:12},
     {type:'enrage'} ] });
