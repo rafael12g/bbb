@@ -138,7 +138,8 @@ function ch2() {
   m.note(8,9,'n_diary1');
   m.note(15,9,'n_child');
   m.item(16,24,'medkit',1);
-  m.item(23,9,'battery',2);
+  m.item(23,9,'battery',3);
+  m.item(30,24,'battery',2);
   m.note(29,24,'f1');
   m.note(36,9,'n_diary2');
   m.item(37,24,'pills',1);
@@ -159,8 +160,9 @@ function ch2() {
   m.hcorr(4,5,28); m.vcorr(17,28,5);
   m.setExit(3,29);
   m.locker(20,16); m.locker(33,17); m.locker(7,21); m.locker(43,17);
-  // spawns far from the player AND from the pharmacy keypad; slower; 6s of grace
-  m.mob(29,23,{enabled:true,speed:2.55,delay:6,roam:[[29,23],[40,16],[22,9],[10,16]]});
+  // spawns far from the player AND from the pharmacy keypad; slow; 8s of grace.
+  // (player walks at 3.6, runs at 6.6 — it can always be outrun in a straight line)
+  m.mob(29,23,{enabled:true,speed:2.35,delay:8,roam:[[29,23],[44,9],[10,9],[43,24]]});
   m.trigger({ x:12,y:16, r:1.4, action:[
     {type:'screamer',text:"UN PATIENT VOUS SAUTE AU VISAGE EN HURLANT. Puis la chaise est vide.",sanity:9},
     {type:'sanity',amount:-4} ] });

@@ -87,10 +87,10 @@ class Monster {
 
   enrage(){ this.enraged = true; this.speed = this.baseSpeed * 1.18; this.state='chase'; }
 
-  canSee(game, p) {
+  canSee(game, p, maxRange) {
     const dx = p.x - this.x, dy = p.y - this.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 11) return false;
+    if (dist > maxRange) return false;
     const steps = Math.ceil(dist / 0.2);
     for (let i = 1; i < steps; i++) {
       const t = i / steps;
@@ -116,14 +116,14 @@ class Monster {
     let sees = false;
     if (!p.hidden) {
       const dist = Math.hypot(p.x - this.x, p.y - this.y);
-      if (this.canSee(game, p)) {
-        // light attracts it from afar; in the dark it only notices you up close
-        if (game.flashlightOn || dist < 2.6) sees = true;
-      }
+      // light no longer betrays you from across the map: ~7 tiles with the torch,
+      // and it can only notice you up close (2.4) in the dark.
+      const range = game.flashlightOn ? 7 : 2.4;
+      if (dist < range && this.canSee(game, p, range)) sees = true;
     }
     let hears = false;
     if (!p.hidden && p.noise > 0) {
-      const hearRad = 3.5 + p.noise * 7.5 + (this.enraged ? 2.5 : 0);
+      const hearRad = 2.5 + p.noise * 6 + (this.enraged ? 2 : 0);
       const dist = Math.hypot(p.x - this.x, p.y - this.y);
       if (dist < hearRad) hears = true;
     }
@@ -136,11 +136,11 @@ class Monster {
     } else if (this.state === 'chase') {
       this.state = 'investigate';
       this.target = this.lastSeen ? { x: Math.floor(this.lastSeen.x), y: Math.floor(this.lastSeen.y) } : null;
-      this.investigateTimer = 5;
+      this.investigateTimer = 2.5;   // gives up the hunt faster — kill the light & it loses you
     } else if (hears) {
       this.state = 'investigate';
       this.target = { x: p.tileX(), y: p.tileY() };
-      this.investigateTimer = 4;
+      this.investigateTimer = 2.2;
     }
 
     this.pathTimer -= dt;

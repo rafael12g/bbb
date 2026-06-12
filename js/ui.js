@@ -59,7 +59,7 @@ const UI = (() => {
 
   // brief, violent screamer flash (mid-gameplay). dur in ms.
   let scrTimer=null;
-  function screamer(dur=480, variant){
+  function screamer(dur=1000, variant){
     const j=$('jumpscare'); const face=j.querySelector('.js-face');
     const v = variant || ('v'+(2+Math.floor(Math.random()*2)));
     face.className='js-face '+v;

@@ -275,23 +275,19 @@ const Game = (() => {
     "IL VOUS A SOURI.",
   ];
   function doScreamer(opts={}){
-    // total blackout for a beat... then the face slams into the screen
+    // a hard cut to silence + black for a split second... then the face SLAMS in
     Audio.holdBreath();
-    UI.blackout(200);
+    UI.blackout(150);
     setTimeout(()=>{
-      UI.screamer(opts.dur||620, opts.variant);
+      UI.screamer(opts.dur||1000, opts.variant);
       Audio.screamer();
-    }, 190);
-    shake = Math.max(shake, opts.shake||34);
-    flickerHold = Math.max(flickerHold, 1.4);
-    state.sanity = Math.max(0, state.sanity - (opts.sanity!=null?opts.sanity:10));
+    }, 140);
+    shake = Math.max(shake, opts.shake||40);
+    flickerHold = Math.max(flickerHold, 1.6);
+    state.sanity = Math.max(0, state.sanity - (opts.sanity!=null?opts.sanity:8));
     if (opts.text!==null)
       UI.subtitle(opts.text || SCARE_LINES[Math.floor(Math.random()*SCARE_LINES.length)], 2200);
-    screamerCD = (opts.cd!=null?opts.cd : (55 + Math.random()*45));
-  }
-  function armScare(){
-    Audio.holdBreath(); Audio.riser(1.25);
-    pendingScare = 1.25; screamerCD = 999;  // held until it fires
+    screamerCD = (opts.cd!=null?opts.cd : (40 + Math.random()*35));
   }
 
   // ---------- fear systems: flicker, ambient events, stalker ----------
@@ -300,14 +296,11 @@ const Game = (() => {
     const near = monster && map.monster && map.monster.enabled
       ? Math.hypot(player.x-monster.x, player.y-monster.y) : 99;
 
-    // ===== screamer scheduler =====
+    // ===== screamer scheduler (sudden — no telegraph) =====
     screamerCD -= dt;
-    if (pendingScare > 0){
-      pendingScare -= dt;
-      if (pendingScare <= 0) doScreamer();
-    } else if (screamerCD <= 0){
+    if (screamerCD <= 0){
       const tension = (1 - state.sanity/100) + (near < 11 ? 0.6 : 0) + map.dread*0.5;
-      if (Math.random() < dt * (0.03 + 0.07*tension)) armScare();
+      if (Math.random() < dt * (0.045 + 0.09*tension)) doScreamer();
     }
 
     // ===== breath right behind you =====
@@ -426,9 +419,9 @@ const Game = (() => {
   function inDarkness(){ return !flashlightActive(); }
 
   function updateMeters(dt){
-    // battery
+    // battery — lasts much longer now (~2 min of continuous use)
     if (flashlightOn && state.battery>0 && matchTimer<=0){
-      state.battery = Math.max(0, state.battery - dt*2.4);
+      state.battery = Math.max(0, state.battery - dt*1.3);
       if (state.battery<15){ lowBatWarn-=dt; if(lowBatWarn<=0){ Audio.batteryLow(); lowBatWarn=1.2; } }
       if (state.battery<=0){ flashlightOn=false; UI.toast("La lampe s'éteint. Vous êtes dans le noir.", 'bad'); }
     }
@@ -439,12 +432,15 @@ const Game = (() => {
     let near = monster ? Math.hypot(player.x-monster.x, player.y-monster.y) : 99;
     let chasing = monster && (monster.state==='chase'||monster.enraged && near<8);
     if (inDarkness()){
-      // the dark in your own head erodes you
-      state.sanity = Math.max(0, state.sanity - dt*(2.0 + dread*3));
+      // darkness ALONE never kills — it bottoms out and just makes you uneasy.
+      // only the creature being close can push you to the breaking point.
+      const floor = near < 7 ? 0 : 28;
+      if (state.sanity > floor)
+        state.sanity = Math.max(floor, state.sanity - dt*(0.9 + dread*1.1));
     } else {
-      state.sanity = Math.min(100, state.sanity + dt*1.2);
+      state.sanity = Math.min(100, state.sanity + dt*1.8);
     }
-    if (near < 6){ state.sanity = Math.max(0, state.sanity - dt*(6-near)*1.4); }
+    if (near < 6){ state.sanity = Math.max(0, state.sanity - dt*(6-near)*1.3); }
     Audio.setBreathing(state.sanity < 35);
 
     // heartbeat scales with threat
